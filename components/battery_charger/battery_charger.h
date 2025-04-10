@@ -101,15 +101,15 @@ class ChargerComponent : public Component {
     void call_update_state_later(CHARGE_STATES new_state);
     CHARGE_STATES charge_state_{INITIAL};
 
-    float absorption_voltage_v_{0};
-    float absorption_current_a_{0};
+    optional<float> absorption_voltage_v_;
+    optional<float> absorption_current_a_;
     InternalTimer absorption_restart_timer_;
     
-    float absorption_restart_voltage_v_{0};
+    optional<float> absorption_restart_voltage_v_;
     InternalTimer absorption_timer_;
     InternalTimer absorption_low_voltage_timer_;
 
-    float equaization_voltage_v_{0};
+    optional<float> equaization_voltage_v_;
     InternalTimer equaization_timeout_timer_;
     InternalTimer equaization_interval_timer_;
     InternalTimer equaization_timer_;
@@ -120,13 +120,13 @@ class ChargerComponent : public Component {
     #ifdef USE_TEXT_SENSOR
     text_sensor::TextSensor *charge_state_sensor_{nullptr};
     #endif
-    float float_voltage_{0};
+    optional<float> float_voltage_;
 
-    float last_current_{0};
+    optional<float> last_current_;
     float last_voltage_{0};
 
-    float max_voltage_{0};
-    float min_voltage_{0};
+    optional<float> max_voltage_;
+    optional<float> min_voltage_;
   
     InternalTimer voltage_auto_recovery_delay_timer_;
 };
