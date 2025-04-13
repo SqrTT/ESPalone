@@ -1,0 +1,31 @@
+
+battery_charger:
+  voltage_sensor: 'voltage_sensor'
+  current_sensor: 'current_testsensor'
+  float_voltage: 13.6V
+  absorption_voltage: 14.4V
+  absorption_current: 2A
+  absorption_restart_voltage: 12.5V
+  absorption_time: 30min
+  voltage_max: 15.5V
+  voltage_min: 9.0V
+  equaization_voltage: 14.6V
+  equaization_time: 1h
+  equaization_interval: 10days
+  equaization_timeout: 4hours
+  target_voltage_sensor: 
+    id: 'target_voltage_sensor'
+    name: 'target_voltage_sensor'
+  charge_state_sensor: 'charge_status'
+
+text_sensor:
+  - platform: template
+    id: charge_status
+    name: "ChargeStatus"
+
+external_components:
+  - source: 
+      type: local
+      path: /root/git/ESPalone/components
+    components: ['battery_charger']
+    

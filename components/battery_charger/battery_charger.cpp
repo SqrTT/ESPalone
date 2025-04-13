@@ -97,6 +97,8 @@ void ChargerComponent::setup() {
       this->charge_state_ = BEFORE_ERROR;
       this->updateState();
     });
+    this->last_voltage_ = this->float_voltage_.value_or(0);
+    this->updateState();
     this->voltage_sensor_->add_on_state_callback([this](float voltage){
       ESP_LOGV(TAG, "Volatge: %.2f V", voltage);
       this->last_voltage_ = voltage;
@@ -291,8 +293,8 @@ void ChargerComponent::updateState() {
     case ERROR:
       ESP_LOGV(TAG, "Charge status ERROR");
       if (this->voltage_auto_recovery_delay_timer_.time_s != 0 && (this->min_voltage_.has_value() || this->max_voltage_.has_value())) {
-        auto is_min_ok = this->min_voltage_.has_value() ? this->last_voltage_ >= this->min_voltage_.value_or(-1) : true;
-        auto is_max_ok = this->max_voltage_.has_value() ? this->last_voltage_ <= this->max_voltage_.value_or(-1) : true;
+        auto is_min_ok = this->min_voltage_.has_value() ? this->last_voltage_ >= this->min_voltage_ : true;
+        auto is_max_ok = this->max_voltage_.has_value() ? this->last_voltage_ <= this->max_voltage_ : true;
 
         if (is_min_ok && is_max_ok) {
           ESP_LOGV(TAG, "Voltage level reaches recovery conditions: %.2f of [%.2f, %.2f]", this->last_voltage_, this->min_voltage_.value_or(-1), this->max_voltage_.value_or(-1));
