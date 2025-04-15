@@ -3,6 +3,8 @@ import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
     UNIT_PERCENT,
+    STATE_CLASS_TOTAL_INCREASING,
+    STATE_CLASS_TOTAL
 )
 
 CODEOWNERS = ["SqrTT"]
@@ -15,7 +17,12 @@ CONF_FULLCHARGE_TIME = "fullcharge_time"
 CONF_DISCHARGE_VOLTAGE = "discharge_voltage"
 CONF_DISCHARGE_TIME = "discharge_time"
 
+UNIT_AMPERE_HOURS = "Ah"
+
 CONF_SOC_SENSOR = "soc_sensor"
+CONF_CHARGE_SENSOR = "charge_sensor"
+CONF_DISCHARGE_SENSOR = "discharge_sensor"
+CONF_REMAINING_SENSOR = "remaining_sensor"
 
 COULOMB_SCHEMA = cv.Schema({
     cv.Required(CONF_FULLCHARGE_VOLTAGE): cv.All(cv.voltage, cv.Range(min=0.0)),
@@ -30,6 +37,21 @@ COULOMB_SCHEMA = cv.Schema({
         unit_of_measurement=UNIT_PERCENT,
         accuracy_decimals=0,
     ),
+    cv.Optional(CONF_CHARGE_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_AMPERE_HOURS,
+        accuracy_decimals=3,
+        state_class=STATE_CLASS_TOTAL_INCREASING,
+    ),
+    cv.Optional(CONF_DISCHARGE_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_AMPERE_HOURS,
+        accuracy_decimals=3,
+        state_class=STATE_CLASS_TOTAL_INCREASING,
+    ),
+    cv.Optional(CONF_REMAINING_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_AMPERE_HOURS,
+        accuracy_decimals=3,
+        state_class=STATE_CLASS_TOTAL,
+    )
 })
 coulomb_meter_ns = cg.esphome_ns.namespace("coulomb_meter")
 CoulombMeter_ns = coulomb_meter_ns.class_(
@@ -49,6 +71,18 @@ async def setup_coulomb(var, config):
     if conf := config.get(CONF_SOC_SENSOR):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_soc_target_sensor(sens))
+
+    if conf := config.get(CONF_CHARGE_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_charge_sensor(sens))
+
+    if conf := config.get(CONF_DISCHARGE_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_discharge_sensor(sens))
+
+    if conf := config.get(CONF_REMAINING_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_remaining_sensor(sens))
 
 CONFIG_SCHEMA = cv.Schema({})
     

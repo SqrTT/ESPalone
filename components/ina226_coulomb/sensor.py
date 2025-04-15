@@ -28,6 +28,7 @@ CONF_ADC_AVERAGING = "adc_averaging"
 CONF_ADC_TIME = "adc_time"
 CONF_CHARGE_COULOMBS = "charge_coulombs"
 CONF_HIGH_FREQUENCY_LOOP = "high_frequency_loop"
+CONF_BUS_VOLTAGE_CALIBRATION = "bus_voltage_calibration"
 UNIT_COULOMB = "C"
 
 ina226_ns = cg.esphome_ns.namespace("ina226_coulomb")
@@ -95,7 +96,7 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_CHARGE_COULOMBS): sensor.sensor_schema(
                 unit_of_measurement=UNIT_COULOMB,
-                accuracy_decimals=3,
+                accuracy_decimals=0,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_HIGH_FREQUENCY_LOOP, default=False): cv.boolean,
@@ -104,6 +105,9 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_MAX_CURRENT, default=3.2): cv.All(
                 cv.current, cv.Range(min=0.0)
+            ),
+            cv.Optional(CONF_BUS_VOLTAGE_CALIBRATION, default=1): cv.All(
+                cv.positive_float, cv.Range(min=0.0)
             ),
             cv.Optional(CONF_ADC_TIME, default="1100 us"): cv.Any(
                 validate_adc_time,
@@ -144,6 +148,9 @@ async def to_code(config):
     if CONF_BUS_VOLTAGE in config:
         sens = await sensor.new_sensor(config[CONF_BUS_VOLTAGE])
         cg.add(var.set_bus_voltage_sensor(sens))
+
+    if CONF_BUS_VOLTAGE_CALIBRATION in config:
+        cg.add(var.set_bus_voltage_calibration(config[CONF_BUS_VOLTAGE_CALIBRATION]))
 
     if CONF_SHUNT_VOLTAGE in config:
         sens = await sensor.new_sensor(config[CONF_SHUNT_VOLTAGE])

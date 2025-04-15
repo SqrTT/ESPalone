@@ -83,6 +83,8 @@ void INA226Component::setup() {
     return;
   }
 
+  this->CoulombMeter::setup();
+
   // high_frequency_loop_requester_.start();
 }
 
@@ -113,7 +115,7 @@ void INA226Component::update() {
     if (this->previous_time_ == 0) {
       this->previous_time_ = millis();
     }
-    this->state_ = State::DATA_COLLECTION_VOLTAGE;
+    this->state_ = State::DATA_COLLECTION_START;
   }
 
   this->status_clear_warning();
@@ -121,14 +123,22 @@ void INA226Component::update() {
 
 void INA226Component::loop() {
 
-
   switch (this->state_) {
     case State::NOT_INITIALIZED:
     case State::IDLE:
       break;
+    case State::DATA_COLLECTION_START:
+    case State::DATA_COLLECTION_CURRENT:
+      this->state_ = State::DATA_COLLECTION_VOLTAGE;
+      this->latestCurrent_ = this->read_current_ma_() / 1000.0f;
+
+      if (this->current_sensor_ != nullptr) {
+        this->current_sensor_->publish_state(this->latestCurrent_);
+      }
+      break;
     case State::DATA_COLLECTION_VOLTAGE:
-      this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
-      if (this->bus_voltage_sensor_ != nullptr) {
+      this->state_ = State::DATA_COLLECTION_POWER;
+      {
         uint16_t raw_bus_voltage;
         if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
           this->status_set_warning();
@@ -136,15 +146,25 @@ void INA226Component::loop() {
         }
         // Convert for 2's compliment and signed value (though always positive)
         // float bus_voltage_v = this->twos_complement_(raw_bus_voltage, 16);
-        float bus_voltage_v = raw_bus_voltage * 0.00125f;
-        this->latestVoltage_ = bus_voltage_v;
-        this->bus_voltage_sensor_->publish_state(bus_voltage_v);
+        this->latestVoltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
+         
+        if (this->bus_voltage_sensor_ != nullptr) {
+          this->bus_voltage_sensor_->publish_state(this->latestVoltage_);
+        }
+      }
+      break;
+
+    case State::DATA_COLLECTION_POWER:
+      this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
+      if (this->power_sensor_ != nullptr) {
+        this->power_sensor_->publish_state(this->latestVoltage_ * this->latestCurrent_);
       } else {
         this->loop();
       }
+
       break;
     case State::DATA_COLLECTION_SHUNT_VOLTAGE:
-      this->state_ = State::DATA_COLLECTION_CURRENT;
+      this->state_ = State::DATA_REPORT_COULUMB;
       if (this->shunt_voltage_sensor_ != nullptr) {
         uint16_t raw_shunt_voltage;
         if (!this->read_byte_16(INA226_REGISTER_SHUNT_VOLTAGE, &raw_shunt_voltage)) {
@@ -159,53 +179,44 @@ void INA226Component::loop() {
         this->loop();
       }
       break;
-    case State::DATA_COLLECTION_CURRENT:
-      this->state_ = State::DATA_COLLECTION_POWER;
-      if (this->current_sensor_ != nullptr) {
-
-        this->latestCurrent_ = this->read_current_ma_() / 1000.0f;
-        this->current_sensor_->publish_state(this->latestCurrent_);
-      } else {
-        this->loop();
-      }
-      break;
-    case State::DATA_COLLECTION_POWER:
-      this->state_ = State::DATA_REPORT_COULUMB;
-      if (this->power_sensor_ != nullptr) {
-        uint16_t raw_power;
-        if (!this->read_byte_16(INA226_REGISTER_POWER, &raw_power)) {
-          this->status_set_warning();
-          return;
-        }
-        float power_mw = int16_t(raw_power) * (this->calibration_lsb_ * 25.0f / 1000.0f);
-        this->power_sensor_->publish_state(power_mw / 1000.0f);
-      } else {
-        this->loop();
-      }
-
-      break;
     case State::DATA_REPORT_COULUMB:
-      this->state_ = State::DATA_CALCULATE_CHARGE;
+      this->state_ = State::DATA_REPORT_PARENT_UPDATE;
 
       if (this->charge_coulombs_sensor_ != nullptr) {
-        this->charge_coulombs_sensor_->publish_state(this->getCharge_c() / 3600.0f);
+        this->charge_coulombs_sensor_->publish_state(this->getCharge_c());
       } else {
         this->loop();
       }
+      #ifdef ESPHOME_LOG_HAS_VERBOSE
+      {
+        auto now = millis();
+        ESP_LOGV(TAG, "Charge reads per second: %f", this->charge_reads_count_ * 1000.0f / (now - this->charge_reads_time_));
+        this->charge_reads_count_ = 0;
+        this->charge_reads_time_ = now;
+      }
+      #endif
     break;
+    case State::DATA_REPORT_PARENT_UPDATE:
+      this->state_ = State::DATA_CALCULATE_CHARGE;
+      this->CoulombMeter::update();
+      break;
     case State::DATA_CALCULATE_CHARGE: {
         uint32_t now = millis();
-  
-        float delta_mc = this->read_current_ma_() * (now - this->previous_time_) / 1000.0f; 
+        auto current = this->read_current_ma_();
+        this->latestCurrent_ = current / 1000.0f;
+        float delta_mc = current * (now - this->previous_time_) / 1000.0f; 
   
         this->partialCharge_mc_ += delta_mc;  
     
         int64_t delta_int = (int64_t)this->partialCharge_mc_;
         this->latestCharge_mc_ += delta_int;
         this->partialCharge_mc_ -= delta_int;
-  
         this->previous_time_ = now;
-    }
+
+        #ifdef ESPHOME_LOG_HAS_VERBOSE
+        this->charge_reads_count_++;
+        #endif
+      }
 
       //
       // this->state_ = State::IDLE;

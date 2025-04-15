@@ -60,14 +60,15 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   void set_high_frequency_loop() { high_frequency_loop_requester_.start(); };
 
   void set_bus_voltage_sensor(sensor::Sensor *bus_voltage_sensor) { bus_voltage_sensor_ = bus_voltage_sensor; }
+  void set_bus_voltage_calibration(float calibration) { bus_voltage_calibration_ = calibration; }
   void set_shunt_voltage_sensor(sensor::Sensor *shunt_voltage_sensor) { shunt_voltage_sensor_ = shunt_voltage_sensor; }
   void set_current_sensor(sensor::Sensor *current_sensor) { current_sensor_ = current_sensor; }
   void set_power_sensor(sensor::Sensor *power_sensor) { power_sensor_ = power_sensor; }
   void set_charge_coulombs_sensor(sensor::Sensor *power_sensor) { charge_coulombs_sensor_ = power_sensor; }
 
-  float getVoltage();
-  float getCurrent();
-  int64_t getCharge_c() { return latestCharge_mc_ / 1000; };
+  float getVoltage() override { return latestVoltage_;  };
+  float getCurrent() override { return latestCurrent_;  };
+  int64_t getCharge_c() override { return latestCharge_mc_ / 1000; } ;
 
  protected:
   HighFrequencyLoopRequester high_frequency_loop_requester_;
@@ -83,6 +84,7 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   sensor::Sensor *current_sensor_{nullptr};
   sensor::Sensor *power_sensor_{nullptr};
   sensor::Sensor *charge_coulombs_sensor_{nullptr};
+  float bus_voltage_calibration_{1};
 
   int32_t twos_complement_(int32_t val, uint8_t bits);
 
@@ -93,17 +95,23 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
 
 
   uint32_t previous_time_{0};
+  #ifdef ESPHOME_LOG_HAS_VERBOSE
+  uint32_t charge_reads_count_{0};
+  uint32_t charge_reads_time_{0};
+  #endif
 
   float read_current_ma_();
 
   enum class State : uint8_t {
     NOT_INITIALIZED = 0x0,
     IDLE,
+    DATA_COLLECTION_START,
     DATA_COLLECTION_VOLTAGE,
     DATA_COLLECTION_SHUNT_VOLTAGE,
     DATA_COLLECTION_CURRENT,
     DATA_COLLECTION_POWER,
     DATA_REPORT_COULUMB,
+    DATA_REPORT_PARENT_UPDATE,
     DATA_CALCULATE_CHARGE
   } state_{State::NOT_INITIALIZED};
 };
