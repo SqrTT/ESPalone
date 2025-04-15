@@ -31,7 +31,10 @@ COULOMB_SCHEMA = cv.Schema({
         accuracy_decimals=0,
     ),
 })
-
+coulomb_meter_ns = cg.esphome_ns.namespace("coulomb_meter")
+CoulombMeter_ns = coulomb_meter_ns.class_(
+    "CoulombMeter", cg.PollingComponent
+)
 
 async def setup_coulomb(var, config):
     # await cg.register_component(var, config)

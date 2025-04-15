@@ -7,7 +7,7 @@
 namespace esphome {
 namespace ina226_coulomb {
 
-static const char *const TAG = "ina226";
+static const char *const TAG = "ina226_coulomb";
 
 // | A0   | A1   | Address |
 // | GND  | GND  | 0x40    |
@@ -82,6 +82,8 @@ void INA226Component::setup() {
     this->mark_failed();
     return;
   }
+
+  // high_frequency_loop_requester_.start();
 }
 
 void INA226Component::dump_config() {
@@ -107,8 +109,10 @@ void INA226Component::dump_config() {
 float INA226Component::get_setup_priority() const { return setup_priority::DATA; }
 
 void INA226Component::update() {
-
-  if (this->is_ready()) {
+  if (this->is_ready()) {    
+    if (this->previous_time_ == 0) {
+      this->previous_time_ = millis();
+    }
     this->state_ = State::DATA_COLLECTION_VOLTAGE;
   }
 
@@ -116,76 +120,113 @@ void INA226Component::update() {
 }
 
 void INA226Component::loop() {
-  if (this->state_ != State::NOT_INITIALIZED && this->is_ready()) {
-    switch (this->state_) {
-      case State::DATA_COLLECTION_VOLTAGE:
-        this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
-        if (this->bus_voltage_sensor_ != nullptr) {
-          uint16_t raw_bus_voltage;
-          if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
-            this->status_set_warning();
-            return;
-          }
-          // Convert for 2's compliment and signed value (though always positive)
-          float bus_voltage_v = this->twos_complement_(raw_bus_voltage, 16);
-          bus_voltage_v *= 0.00125f;
-          this->bus_voltage_sensor_->publish_state(bus_voltage_v);
-        } else {
-          this->loop();
+
+
+  switch (this->state_) {
+    case State::NOT_INITIALIZED:
+    case State::IDLE:
+      break;
+    case State::DATA_COLLECTION_VOLTAGE:
+      this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
+      if (this->bus_voltage_sensor_ != nullptr) {
+        uint16_t raw_bus_voltage;
+        if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
+          this->status_set_warning();
+          return;
         }
-        break;
-      case State::DATA_COLLECTION_SHUNT_VOLTAGE:
-        this->state_ = State::DATA_COLLECTION_CURRENT;
-        if (this->shunt_voltage_sensor_ != nullptr) {
-          uint16_t raw_shunt_voltage;
-          if (!this->read_byte_16(INA226_REGISTER_SHUNT_VOLTAGE, &raw_shunt_voltage)) {
-            this->status_set_warning();
-            return;
-          }
-          // Convert for 2's compliment and signed value
-          float shunt_voltage_v = this->twos_complement_(raw_shunt_voltage, 16);
-          shunt_voltage_v *= 0.0000025f;
-          this->shunt_voltage_sensor_->publish_state(shunt_voltage_v);
-        } else {
-          this->loop();
+        // Convert for 2's compliment and signed value (though always positive)
+        // float bus_voltage_v = this->twos_complement_(raw_bus_voltage, 16);
+        float bus_voltage_v = raw_bus_voltage * 0.00125f;
+        this->latestVoltage_ = bus_voltage_v;
+        this->bus_voltage_sensor_->publish_state(bus_voltage_v);
+      } else {
+        this->loop();
+      }
+      break;
+    case State::DATA_COLLECTION_SHUNT_VOLTAGE:
+      this->state_ = State::DATA_COLLECTION_CURRENT;
+      if (this->shunt_voltage_sensor_ != nullptr) {
+        uint16_t raw_shunt_voltage;
+        if (!this->read_byte_16(INA226_REGISTER_SHUNT_VOLTAGE, &raw_shunt_voltage)) {
+          this->status_set_warning();
+          return;
         }
-        break;
-      case State::DATA_COLLECTION_CURRENT:
-        this->state_ = State::DATA_COLLECTION_POWER;
-        if (this->current_sensor_ != nullptr) {
-          uint16_t raw_current;
-          if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
-            this->status_set_warning();
-            return;
-          }
-          // Convert for 2's compliment and signed value
-          float current_ma = this->twos_complement_(raw_current, 16);
-          current_ma *= (this->calibration_lsb_ / 1000.0f);
-          this->current_sensor_->publish_state(current_ma / 1000.0f);
-        } else {
-          this->loop();
+        // Convert for 2's compliment and signed value
+        float shunt_voltage_v = this->twos_complement_(raw_shunt_voltage, 16);
+        shunt_voltage_v *= 0.0000025f;
+        this->shunt_voltage_sensor_->publish_state(shunt_voltage_v);
+      } else {
+        this->loop();
+      }
+      break;
+    case State::DATA_COLLECTION_CURRENT:
+      this->state_ = State::DATA_COLLECTION_POWER;
+      if (this->current_sensor_ != nullptr) {
+
+        this->latestCurrent_ = this->read_current_ma_() / 1000.0f;
+        this->current_sensor_->publish_state(this->latestCurrent_);
+      } else {
+        this->loop();
+      }
+      break;
+    case State::DATA_COLLECTION_POWER:
+      this->state_ = State::DATA_REPORT_COULUMB;
+      if (this->power_sensor_ != nullptr) {
+        uint16_t raw_power;
+        if (!this->read_byte_16(INA226_REGISTER_POWER, &raw_power)) {
+          this->status_set_warning();
+          return;
         }
-        break;
-      case State::DATA_COLLECTION_POWER:
-        this->state_ = State::DATA_COLLECTION_AH;
-        if (this->power_sensor_ != nullptr) {
-          uint16_t raw_power;
-          if (!this->read_byte_16(INA226_REGISTER_POWER, &raw_power)) {
-            this->status_set_warning();
-            return;
-          }
-          float power_mw = int16_t(raw_power) * (this->calibration_lsb_ * 25.0f / 1000.0f);
-          this->power_sensor_->publish_state(power_mw / 1000.0f);
-        }
-        break;
-      case State::DATA_COLLECTION_AH:
+        float power_mw = int16_t(raw_power) * (this->calibration_lsb_ * 25.0f / 1000.0f);
+        this->power_sensor_->publish_state(power_mw / 1000.0f);
+      } else {
+        this->loop();
+      }
 
       break;
-      default:
-        break;
+    case State::DATA_REPORT_COULUMB:
+      this->state_ = State::DATA_CALCULATE_CHARGE;
+
+      if (this->charge_coulombs_sensor_ != nullptr) {
+        this->charge_coulombs_sensor_->publish_state(this->getCharge_c() / 3600.0f);
+      } else {
+        this->loop();
+      }
+    break;
+    case State::DATA_CALCULATE_CHARGE: {
+        uint32_t now = millis();
+  
+        float delta_mc = this->read_current_ma_() * (now - this->previous_time_) / 1000.0f; 
+  
+        this->partialCharge_mc_ += delta_mc;  
+    
+        int64_t delta_int = (int64_t)this->partialCharge_mc_;
+        this->latestCharge_mc_ += delta_int;
+        this->partialCharge_mc_ -= delta_int;
+  
+        this->previous_time_ = now;
     }
 
+      //
+      // this->state_ = State::IDLE;
+    break;
+    default:
+      break;
   }
+}
+
+float INA226Component::read_current_ma_() {
+  uint16_t raw_current;
+  if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
+    this->status_set_warning();
+    return 0.0f;
+  }
+  
+  // Convert for 2's compliment and signed value
+  float current_ma = this->twos_complement_(raw_current, 16);
+  current_ma *= (this->calibration_lsb_ / 1000.0f);
+  
+  return current_ma;
 }
 
 int32_t INA226Component::twos_complement_(int32_t val, uint8_t bits) {
