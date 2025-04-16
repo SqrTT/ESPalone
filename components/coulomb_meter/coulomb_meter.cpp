@@ -39,11 +39,20 @@ namespace esphome {
       if (this->meter_state_ == State::SETUP) {
         // use initial charge based on voltage
         current_charge_c_ = clamp_map(
+          voltage * 1000,
+          fully_discharge_voltage_v_ * 1000,
+          fully_charge_voltage_ * 1000,
+          0,
+          full_charge_calculated_c_.value_or(full_capacity_c_)
+        );
+
+        current_energy_j_ = clamp_map(
             voltage * 1000,
             fully_discharge_voltage_v_ * 1000,
             fully_charge_voltage_ * 1000,
             0,
-            full_charge_calculated_c_.value_or(full_capacity_c_));
+            full_energy_calculated_j_.value_or(full_energy_j_)
+        );
         this->meter_state_ = State::IDLE;
       }
 
@@ -201,7 +210,7 @@ namespace esphome {
 
         if (energy_level_sensor_ != nullptr) {
           auto current_energy_level_ = clamp_map(
-            this->current_charge_c_,
+            this->current_energy_j_,
             0,
             full_energy_calculated_j_.value_or(full_energy_j_),
             0,
