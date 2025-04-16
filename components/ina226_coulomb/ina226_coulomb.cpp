@@ -116,12 +116,49 @@ void INA226Component::update() {
       this->previous_time_ = millis();
     }
     this->state_ = State::DATA_COLLECTION_START;
+    this->CoulombMeter::update();
   }
 
   this->status_clear_warning();
 }
 
 void INA226Component::loop() {
+
+  uint32_t now = millis();
+  if (reads_count_++ == 0) {
+    uint16_t raw_bus_voltage;
+    if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
+      this->status_set_warning();
+      return;
+    }
+
+    this->latestVoltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
+  } else {
+    if (reads_count_ > 20) {
+      reads_count_ = 0;
+    };
+    auto current = this->read_current_ma_();
+    this->latestCurrent_ = current / 1000.0f;
+    float delta_mc = current * (now - this->previous_time_) / 1000.0f; 
+
+    this->partialCharge_mc_ += delta_mc; 
+    
+    int64_t delta_int = (int64_t)this->partialCharge_mc_;
+    this->latestCharge_mc_ += delta_int;
+    this->partialCharge_mc_ -= delta_int;
+    
+    this->partialEnergy_mj_ += this->latestVoltage_.value_or(0) * delta_mc; 
+    int64_t energy_int = (int64_t)this->partialEnergy_mj_;
+    this->latestEnergy_mj_ += energy_int;
+    this->partialEnergy_mj_ -= energy_int;
+
+    this->previous_time_ = now;
+  }
+
+  #ifdef ESPHOME_LOG_HAS_VERBOSE
+  this->charge_reads_count_++;
+  #endif
+
 
   switch (this->state_) {
     case State::NOT_INITIALIZED:
@@ -130,34 +167,28 @@ void INA226Component::loop() {
     case State::DATA_COLLECTION_START:
     case State::DATA_COLLECTION_CURRENT:
       this->state_ = State::DATA_COLLECTION_VOLTAGE;
-      this->latestCurrent_ = this->read_current_ma_() / 1000.0f;
 
       if (this->current_sensor_ != nullptr) {
         this->current_sensor_->publish_state(this->latestCurrent_);
+      } else {
+        this->loop();
       }
       break;
     case State::DATA_COLLECTION_VOLTAGE:
       this->state_ = State::DATA_COLLECTION_POWER;
-      {
-        uint16_t raw_bus_voltage;
-        if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
-          this->status_set_warning();
-          return;
-        }
-        // Convert for 2's compliment and signed value (though always positive)
-        // float bus_voltage_v = this->twos_complement_(raw_bus_voltage, 16);
-        this->latestVoltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
-         
-        if (this->bus_voltage_sensor_ != nullptr) {
-          this->bus_voltage_sensor_->publish_state(this->latestVoltage_);
-        }
+
+      if (this->bus_voltage_sensor_ != nullptr && latestVoltage_.has_value()) {
+        this->bus_voltage_sensor_->publish_state(this->latestVoltage_.value_or(0));
+      } else {
+        this->loop();
       }
+      
       break;
 
     case State::DATA_COLLECTION_POWER:
       this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
-      if (this->power_sensor_ != nullptr) {
-        this->power_sensor_->publish_state(this->latestVoltage_ * this->latestCurrent_);
+      if (this->power_sensor_ != nullptr && this->latestVoltage_.has_value()) {
+        this->power_sensor_->publish_state(this->latestVoltage_.value_or(0) * this->latestCurrent_);
       } else {
         this->loop();
       }
@@ -197,30 +228,10 @@ void INA226Component::loop() {
       #endif
     break;
     case State::DATA_REPORT_PARENT_UPDATE:
-      this->state_ = State::DATA_CALCULATE_CHARGE;
-      this->CoulombMeter::update();
+      if (this->CoulombMeter::updateSensors()) {
+        this->state_ = State::IDLE;
+      };
       break;
-    case State::DATA_CALCULATE_CHARGE: {
-        uint32_t now = millis();
-        auto current = this->read_current_ma_();
-        this->latestCurrent_ = current / 1000.0f;
-        float delta_mc = current * (now - this->previous_time_) / 1000.0f; 
-  
-        this->partialCharge_mc_ += delta_mc;  
-    
-        int64_t delta_int = (int64_t)this->partialCharge_mc_;
-        this->latestCharge_mc_ += delta_int;
-        this->partialCharge_mc_ -= delta_int;
-        this->previous_time_ = now;
-
-        #ifdef ESPHOME_LOG_HAS_VERBOSE
-        this->charge_reads_count_++;
-        #endif
-      }
-
-      //
-      // this->state_ = State::IDLE;
-    break;
     default:
       break;
   }

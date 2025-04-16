@@ -66,9 +66,10 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   void set_power_sensor(sensor::Sensor *power_sensor) { power_sensor_ = power_sensor; }
   void set_charge_coulombs_sensor(sensor::Sensor *power_sensor) { charge_coulombs_sensor_ = power_sensor; }
 
-  float getVoltage() override { return latestVoltage_;  };
+  float getVoltage() override { return latestVoltage_.value_or(0);  };
   float getCurrent() override { return latestCurrent_;  };
   int64_t getCharge_c() override { return latestCharge_mc_ / 1000; } ;
+  int64_t getEnergy_j() override { return latestEnergy_mj_ / 1000; } ;
 
  protected:
   HighFrequencyLoopRequester high_frequency_loop_requester_;
@@ -88,12 +89,16 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
 
   int32_t twos_complement_(int32_t val, uint8_t bits);
 
-  float latestVoltage_{0};
+  optional<float> latestVoltage_;
   float latestCurrent_{0};
+
+  int64_t latestEnergy_mj_{0};
+  float partialEnergy_mj_{0};
+
   int64_t latestCharge_mc_{0};
   float partialCharge_mc_{0};
 
-
+  uint32_t reads_count_{0};
   uint32_t previous_time_{0};
   #ifdef ESPHOME_LOG_HAS_VERBOSE
   uint32_t charge_reads_count_{0};
