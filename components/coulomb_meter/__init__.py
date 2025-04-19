@@ -3,6 +3,8 @@ import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
     UNIT_PERCENT,
+    ICON_TIMER,
+    UNIT_MINUTE,
     UNIT_WATT_HOURS,
     STATE_CLASS_TOTAL_INCREASING,
     STATE_CLASS_TOTAL
@@ -31,6 +33,10 @@ CONF_ENERGY_REMAINING_SENSOR = "energy_remaining_sensor"
 CONF_ENERGY_IN_SENSOR = "energy_in_sensor"
 CONF_ENERGY_OUT_SENSOR = "energy_out_sensor"
 
+CONF_CHARGE_TIME_REMAINING_SENSOR = "charge_time_remaining_sensor"
+CONF_DISCHARGE_TIME_REMAINING_SENSOR = "discharge_time_remaining_sensor"
+
+
 COULOMB_SCHEMA = cv.Schema({
     cv.Required(CONF_FULLCHARGE_VOLTAGE): cv.All(cv.voltage, cv.Range(min=0.0)),
     cv.Required(CONF_FULLCHARGE_CURRENT): cv.All(cv.current, cv.Range(min=0.0)),
@@ -42,6 +48,16 @@ COULOMB_SCHEMA = cv.Schema({
     cv.Required(CONF_ENERGY_FULL): cv.All(cv.float_range(min=0)),
 
 
+    cv.Optional(CONF_CHARGE_TIME_REMAINING_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_MINUTE,
+        accuracy_decimals=2,
+        icon=ICON_TIMER
+    ),
+    cv.Optional(CONF_DISCHARGE_TIME_REMAINING_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_MINUTE,
+        accuracy_decimals=2,
+        icon=ICON_TIMER
+    ),
 
     ### amps sensors
     cv.Optional(CONF_CHARGE_LEVEL_SENSOR): sensor.sensor_schema(
@@ -68,6 +84,7 @@ COULOMB_SCHEMA = cv.Schema({
     cv.Optional(CONF_ENERGY_LEVEL_SENSOR): sensor.sensor_schema(
         unit_of_measurement=UNIT_PERCENT,
         accuracy_decimals=0,
+        state_class=STATE_CLASS_TOTAL,
     ),
     cv.Optional(CONF_ENERGY_REMAINING_SENSOR): sensor.sensor_schema(
         unit_of_measurement=UNIT_WATT_HOURS,
@@ -101,6 +118,13 @@ async def setup_coulomb(var, config):
     cg.add(var.set_full_capacity(config[CONF_CAPACITY_AH]))
     cg.add(var.set_full_energy(config[CONF_ENERGY_FULL]))
 
+    if conf := config.get(CONF_DISCHARGE_TIME_REMAINING_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_discharge_time_remaining_sensor(sens))
+
+    if conf := config.get(CONF_CHARGE_TIME_REMAINING_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_charge_time_remaining_sensor(sens))
 
     if conf := config.get(CONF_CHARGE_LEVEL_SENSOR):
         sens = await sensor.new_sensor(conf)

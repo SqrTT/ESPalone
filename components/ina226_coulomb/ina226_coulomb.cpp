@@ -74,7 +74,7 @@ void INA226Component::setup() {
 
   this->calibration_lsb_ = lsb;
 
-  auto calibration = uint32_t(0.00512 / (lsb * this->shunt_resistance_ohm_ / 1000000.0f));
+  const auto calibration = uint32_t(0.00512 / (lsb * this->shunt_resistance_ohm_ / 1000000.0f));
 
   ESP_LOGV(TAG, "    Using LSB=%" PRIu32 " calibration=%" PRIu32, lsb, calibration);
 
@@ -124,7 +124,7 @@ void INA226Component::update() {
 
 void INA226Component::loop() {
 
-  uint32_t now = millis();
+  const auto now = millis();
   if (reads_count_++ == 0) {
     uint16_t raw_bus_voltage;
     if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
@@ -137,18 +137,18 @@ void INA226Component::loop() {
     if (reads_count_ > 20) {
       reads_count_ = 0;
     };
-    auto current = this->read_current_ma_();
+    const auto current = this->read_current_ma_();
     this->latestCurrent_ = current / 1000.0f;
-    float delta_mc = current * (now - this->previous_time_) / 1000.0f; 
+    const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
 
     this->partialCharge_mc_ += delta_mc; 
     
-    int64_t delta_int = (int64_t)this->partialCharge_mc_;
+    const int64_t delta_int = (int64_t)this->partialCharge_mc_;
     this->latestCharge_mc_ += delta_int;
     this->partialCharge_mc_ -= delta_int;
     
     this->partialEnergy_mj_ += this->latestVoltage_.value_or(0) * delta_mc; 
-    int64_t energy_int = (int64_t)this->partialEnergy_mj_;
+    const int64_t energy_int = (int64_t)this->partialEnergy_mj_;
     this->latestEnergy_mj_ += energy_int;
     this->partialEnergy_mj_ -= energy_int;
 
@@ -245,9 +245,8 @@ float INA226Component::read_current_ma_() {
   }
   
   // Convert for 2's compliment and signed value
-  float current_ma = this->twos_complement_(raw_current, 16);
-  current_ma *= (this->calibration_lsb_ / 1000.0f);
-  
+  const float current_ma = this->twos_complement_(raw_current, 16) * (this->calibration_lsb_ / 1000.0f);
+
   return current_ma;
 }
 
