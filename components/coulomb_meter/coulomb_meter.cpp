@@ -303,7 +303,7 @@ namespace esphome {
           } else {
             const auto time_remaining = this->current_energy_j_ / avg_energy_usage_minutes;
   
-            if (charge_time_remaining_sensor_ != nullptr && !std::isnan(discharge_time_remaining_sensor_->state)) {
+            if (charge_time_remaining_sensor_ != nullptr && !std::isnan(charge_time_remaining_sensor_->state)) {
               charge_time_remaining_sensor_->publish_state(NAN);
             }
             if (discharge_time_remaining_sensor_ != nullptr) {
