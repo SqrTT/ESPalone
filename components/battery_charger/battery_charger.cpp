@@ -101,6 +101,10 @@ void ChargerComponent::setup() {
     this->updateState();
     this->voltage_sensor_->add_on_state_callback([this](float voltage){
       ESP_LOGV(TAG, "Volatge: %.2f V", voltage);
+      if (std::isnan(voltage)) {
+        ESP_LOGE(TAG, "Invalid voltage value");
+        return;
+      }
       this->last_voltage_ = voltage;
       this->set_timeout("NO_VOLTAGE_UPDATE_FOR_LONG_TIME", 5 * 60 * 1000, [this]() {
         this->status_set_error("No voltage update for long time, is sensor working?");
@@ -114,6 +118,10 @@ void ChargerComponent::setup() {
     if (this->current_sensor_ != nullptr) {
       this->current_sensor_->add_on_state_callback([this](float current){
         ESP_LOGV(TAG, "Current: %.2f A", current);
+        if (std::isnan(current)) {
+          ESP_LOGE(TAG, "Invalid current value");
+          return;
+        }
         this->last_current_ = current;
         this->updateState();
       });

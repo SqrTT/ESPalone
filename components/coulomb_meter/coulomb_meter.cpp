@@ -295,19 +295,19 @@ namespace esphome {
             
 
             if (charge_time_remaining_sensor_ != nullptr) {
-              charge_time_remaining_sensor_->publish_state(time_remaining);
+              charge_time_remaining_sensor_->publish_state(std::min(9999.9f, time_remaining));
             }
-            if (discharge_time_remaining_sensor_ != nullptr) {
-              discharge_time_remaining_sensor_->publish_state(0);
+            if (discharge_time_remaining_sensor_ != nullptr && !std::isnan(discharge_time_remaining_sensor_->state)) {
+              discharge_time_remaining_sensor_->publish_state(NAN);
             }
           } else {
             const auto time_remaining = this->current_energy_j_ / avg_energy_usage_minutes;
   
-            if (charge_time_remaining_sensor_ != nullptr) {
-              charge_time_remaining_sensor_->publish_state(0);
+            if (charge_time_remaining_sensor_ != nullptr && !std::isnan(discharge_time_remaining_sensor_->state)) {
+              charge_time_remaining_sensor_->publish_state(NAN);
             }
             if (discharge_time_remaining_sensor_ != nullptr) {
-              discharge_time_remaining_sensor_->publish_state(-time_remaining);
+              discharge_time_remaining_sensor_->publish_state(std::min(9999.9f, -time_remaining));
             }
           }
 
