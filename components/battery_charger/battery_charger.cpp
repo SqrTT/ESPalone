@@ -182,7 +182,7 @@ void ChargerComponent::updateState() {
           return;
         }
         ESP_LOGV(TAG, "Starting absorption timer: for %i sec", this->absorption_timer_.time_s);
-        
+
         this->absorption_timer_.start([this]() {
           ESP_LOGV(TAG, "Fired absorption timer: for %i sec. Swithing to FLOAT", this->absorption_timer_.time_s);
           this->call_update_state_later(BEFORE_FLOAT);

@@ -2,11 +2,12 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/application.h"
-
+#include <optional>  
 
 namespace esphome {
 namespace coulomb_meter {
 
+  
 
 class InternalTimer {
   public:
@@ -36,14 +37,15 @@ class InternalTimer {
     if (this->is_running_) {
       ESP_LOGV("BatteryCharger", "Stoping timer '%s'", this->name_);
       this->is_running_ = false;
+     
       App.scheduler.cancel_timeout(this->component_, this->name_);
     }
   }
 
   u_int32_t time_s{0};
   protected:
-    Component* component_;
-    const char *name_;
+    Component* component_{nullptr};
+    const char *name_{nullptr};
     bool is_running_{false};
 };
 
@@ -124,6 +126,8 @@ class CoulombMeter : public PollingComponent {
  protected:
     bool updateSensors();
     void updateState();
+
+    void publish_state_(sensor::Sensor *sensor, float value);
 
     // int16_t current_charge_level_{0};
     // int16_t current_energy_level_{0};
