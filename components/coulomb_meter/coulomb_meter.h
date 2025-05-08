@@ -118,10 +118,10 @@ class CoulombMeter : public PollingComponent {
   void set_charge_time_remaining_sensor(sensor::Sensor *sensor) { charge_time_remaining_sensor_ = sensor; };
   void set_discharge_time_remaining_sensor(sensor::Sensor *sensor) { discharge_time_remaining_sensor_ = sensor; };
   
-  virtual float getVoltage();
-  virtual float getCurrent();
-  virtual int64_t getCharge_c();
-  virtual int64_t getEnergy_j();
+  virtual float get_voltage();
+  virtual float get_current();
+  virtual int64_t get_charge_c();
+  virtual int64_t get_energy_j();
 
  protected:
     bool updateSensors();
@@ -144,9 +144,13 @@ class CoulombMeter : public PollingComponent {
     int32_t full_capacity_c_{0};
     int32_t full_energy_j_{0};
     optional<int32_t> full_charge_calculated_c_;
+    ESPPreferenceObject pref_full_charge_calculated_c_;
     optional<int32_t> full_energy_calculated_j_;
+    ESPPreferenceObject pref_full_energy_calculated_j_;
     int32_t current_charge_c_{0};
+    ESPPreferenceObject pref_current_charge_c_;
     int32_t current_energy_j_{0};
+    ESPPreferenceObject pref_current_energy_j_;
 
     int64_t previous_charge_c_{0};
     int64_t previous_energy_j_{0};

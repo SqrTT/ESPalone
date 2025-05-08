@@ -66,10 +66,10 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   void set_power_sensor(sensor::Sensor *power_sensor) { power_sensor_ = power_sensor; }
   void set_charge_coulombs_sensor(sensor::Sensor *power_sensor) { charge_coulombs_sensor_ = power_sensor; }
 
-  float getVoltage() override { return latestVoltage_.value_or(0);  };
-  float getCurrent() override { return latestCurrent_;  };
-  int64_t getCharge_c() override { return latestCharge_mc_ / 1000; } ;
-  int64_t getEnergy_j() override { return latestEnergy_mj_ / 1000; } ;
+  float get_voltage() override { return latest_voltage_.value_or(0);  };
+  float get_current() override { return latest_current_;  };
+  int64_t get_charge_c() override { return latest_charge_mc_ / 1000; } ;
+  int64_t get_energy_j() override { return latest_energy_mj_ / 1000; } ;
 
  protected:
   HighFrequencyLoopRequester high_frequency_loop_requester_;
@@ -89,14 +89,14 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
 
   int32_t twos_complement_(int32_t val, uint8_t bits);
 
-  optional<float> latestVoltage_;
-  float latestCurrent_{0};
+  optional<float> latest_voltage_;
+  float latest_current_{0};
 
-  int64_t latestEnergy_mj_{0};
-  float partialEnergy_mj_{0};
+  int64_t latest_energy_mj_{0};
+  float partial_energy_mj_{0};
 
-  int64_t latestCharge_mc_{0};
-  float partialCharge_mc_{0};
+  int64_t latest_charge_mc_{0};
+  float partial_charge_mc_{0};
 
   uint32_t reads_count_{0};
   uint32_t previous_time_{0};

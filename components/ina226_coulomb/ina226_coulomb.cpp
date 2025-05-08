@@ -132,25 +132,25 @@ void INA226Component::loop() {
       return;
     }
 
-    this->latestVoltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
+    this->latest_voltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
   } else {
     if (reads_count_ > 20) {
       reads_count_ = 0;
     };
     const auto current = this->read_current_ma_();
-    this->latestCurrent_ = current / 1000.0f;
+    this->latest_current_ = current / 1000.0f;
     const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
 
-    this->partialCharge_mc_ += delta_mc; 
+    this->partial_charge_mc_ += delta_mc; 
     
-    const int64_t delta_int = (int64_t)this->partialCharge_mc_;
-    this->latestCharge_mc_ += delta_int;
-    this->partialCharge_mc_ -= delta_int;
+    const int64_t delta_int = (int64_t)this->partial_charge_mc_;
+    this->latest_charge_mc_ += delta_int;
+    this->partial_charge_mc_ -= delta_int;
     
-    this->partialEnergy_mj_ += this->latestVoltage_.value_or(0) * delta_mc; 
-    const int64_t energy_int = (int64_t)this->partialEnergy_mj_;
-    this->latestEnergy_mj_ += energy_int;
-    this->partialEnergy_mj_ -= energy_int;
+    this->partial_energy_mj_ += this->latest_voltage_.value_or(0) * delta_mc; 
+    const int64_t energy_int = (int64_t)this->partial_energy_mj_;
+    this->latest_energy_mj_ += energy_int;
+    this->partial_energy_mj_ -= energy_int;
 
     this->previous_time_ = now;
   }
@@ -169,7 +169,7 @@ void INA226Component::loop() {
       this->state_ = State::DATA_COLLECTION_VOLTAGE;
 
       if (this->current_sensor_ != nullptr) {
-        this->current_sensor_->publish_state(this->latestCurrent_);
+        this->current_sensor_->publish_state(this->latest_current_);
       } else {
         this->loop();
       }
@@ -177,8 +177,8 @@ void INA226Component::loop() {
     case State::DATA_COLLECTION_VOLTAGE:
       this->state_ = State::DATA_COLLECTION_POWER;
 
-      if (this->bus_voltage_sensor_ != nullptr && latestVoltage_.has_value()) {
-        this->bus_voltage_sensor_->publish_state(this->latestVoltage_.value_or(0));
+      if (this->bus_voltage_sensor_ != nullptr && latest_voltage_.has_value()) {
+        this->bus_voltage_sensor_->publish_state(this->latest_voltage_.value_or(0));
       } else {
         this->loop();
       }
@@ -187,8 +187,8 @@ void INA226Component::loop() {
 
     case State::DATA_COLLECTION_POWER:
       this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
-      if (this->power_sensor_ != nullptr && this->latestVoltage_.has_value()) {
-        this->power_sensor_->publish_state(this->latestVoltage_.value_or(0) * this->latestCurrent_);
+      if (this->power_sensor_ != nullptr && this->latest_voltage_.has_value()) {
+        this->power_sensor_->publish_state(this->latest_voltage_.value_or(0) * this->latest_current_);
       } else {
         this->loop();
       }
@@ -214,7 +214,7 @@ void INA226Component::loop() {
       this->state_ = State::DATA_REPORT_PARENT_UPDATE;
 
       if (this->charge_coulombs_sensor_ != nullptr) {
-        this->charge_coulombs_sensor_->publish_state(this->getCharge_c());
+        this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
       } else {
         this->loop();
       }
