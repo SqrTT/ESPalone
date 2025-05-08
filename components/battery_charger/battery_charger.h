@@ -57,8 +57,8 @@ namespace battery_charger {
     ABSORPTION,
     BEFORE_FLOAT,
     FLOAT,
-    BEFORE_EQUAIZATION,
-    EQUAIZATION,
+    BEFORE_EQUALIZATION,
+    EQUALIZATION,
     BEFORE_ERROR,
     ERROR,
   };
@@ -87,10 +87,10 @@ class ChargerComponent : public Component {
   void set_absorption_low_voltage_delay_s_(u_int32_t time) { this->absorption_low_voltage_timer_.setup(this, time, "ABSORPTION_LOW_VOLTAGE"); };
 
 
-  void set_equaization_time(u_int32_t time) { this->equaization_timer_.setup(this, time, "EQUAIZATION_TIME"); };
-  void set_equaization_interval(u_int32_t time) { this->equaization_interval_timer_.setup(this, time, "EQUAIZATION_INTERVAL_TIMER"); };
-  void set_equaization_timeout(u_int32_t time) { this->equaization_timeout_timer_.setup(this, time, "EQUAIZATION_TIMEOUT"); };
-  void set_equaization_voltage(float voltage) { equaization_voltage_v_ = voltage; };
+  void set_equalization_time(u_int32_t time) { this->equalization_timer_.setup(this, time, "equalization_TIME"); };
+  void set_equalization_interval(u_int32_t time) { this->equalization_interval_timer_.setup(this, time, "equalization_INTERVAL_TIMER"); };
+  void set_equalization_timeout(u_int32_t time) { this->equalization_timeout_timer_.setup(this, time, "equalization_TIMEOUT"); };
+  void set_equalization_voltage(float voltage) { equalization_voltage_v_ = voltage; };
 
   void set_max_voltage(float voltage) { max_voltage_ = voltage; };
   void set_min_voltage(float voltage) { min_voltage_ = voltage; };
@@ -109,10 +109,10 @@ class ChargerComponent : public Component {
     InternalTimer absorption_timer_;
     InternalTimer absorption_low_voltage_timer_;
 
-    optional<float> equaization_voltage_v_;
-    InternalTimer equaization_timeout_timer_;
-    InternalTimer equaization_interval_timer_;
-    InternalTimer equaization_timer_;
+    optional<float> equalization_voltage_v_;
+    InternalTimer equalization_timeout_timer_;
+    InternalTimer equalization_interval_timer_;
+    InternalTimer equalization_timer_;
     
     sensor::Sensor *voltage_sensor_{nullptr};
     sensor::Sensor *current_sensor_{nullptr};

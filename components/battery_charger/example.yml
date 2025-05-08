@@ -9,10 +9,10 @@ battery_charger:
   absorption_time: 30min
   voltage_max: 15.5V
   voltage_min: 9.0V
-  equaization_voltage: 14.6V
-  equaization_time: 1h
-  equaization_interval: 10days
-  equaization_timeout: 4hours
+  equalization_voltage: 14.6V
+  equalization_time: 1h
+  equalization_interval: 10days
+  equalization_timeout: 4hours
   target_voltage_sensor: 
     id: 'target_voltage_sensor'
     name: 'target_voltage_sensor'

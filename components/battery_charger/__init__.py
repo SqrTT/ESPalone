@@ -28,10 +28,10 @@ CONF_ABSORPTION_RESTART_TIME = 'absorption_restart_time'
 CONF_ABSORPTION_RESTART_VOLTAGE = 'absorption_restart_voltage'
 CONF_ABSORPTION_LOW_VOLTAGE_DELAY = 'absorption_low_voltage_delay'
 
-CONF_EQUAIZATION_VOLTAGE = 'equaization_voltage'
-CONF_EQUAIZATION_TIME = 'equaization_time'
-CONF_EQUAIZATION_INTERVAL = 'equaization_interval'
-CONF_EQUAIZATION_TIMEOUT = 'equaization_timeout'
+CONF_EQUALIZATION_VOLTAGE = 'equalization_voltage'
+CONF_EQUALIZATION_TIME = 'equalization_time'
+CONF_EQUALIZATION_INTERVAL = 'equalization_interval'
+CONF_EQUALIZATION_TIMEOUT = 'equalization_timeout'
 
 charger_ns = cg.esphome_ns.namespace("battery_charger")
 ChargerComponent = charger_ns.class_(
@@ -62,10 +62,10 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_ABSORPTION_TIME): cv.positive_time_period_seconds,
             cv.Optional(CONF_ABSORPTION_LOW_VOLTAGE_DELAY, default= '1min'): cv.positive_time_period_seconds,
 
-            cv.Optional(CONF_EQUAIZATION_VOLTAGE): cv.voltage,
-            cv.Optional(CONF_EQUAIZATION_TIME, default= "1h"): cv.positive_time_period_seconds,
-            cv.Optional(CONF_EQUAIZATION_INTERVAL, default="7d"): cv.positive_time_period_seconds,
-            cv.Optional(CONF_EQUAIZATION_TIMEOUT, default= '3h'): cv.positive_time_period_seconds,
+            cv.Optional(CONF_EQUALIZATION_VOLTAGE): cv.voltage,
+            cv.Optional(CONF_EQUALIZATION_TIME, default= "1h"): cv.positive_time_period_seconds,
+            cv.Optional(CONF_EQUALIZATION_INTERVAL, default="7d"): cv.positive_time_period_seconds,
+            cv.Optional(CONF_EQUALIZATION_TIMEOUT, default= '3h'): cv.positive_time_period_seconds,
 
         }
     ).extend(cv.COMPONENT_SCHEMA),
@@ -117,17 +117,17 @@ async def to_code(config):
             cg.add(var.set_absorption_low_voltage_delay_s_(config[CONF_ABSORPTION_LOW_VOLTAGE_DELAY]))
 
     ###
-    if config.get(CONF_EQUAIZATION_VOLTAGE) is not None:
-        cg.add(var.set_equaization_voltage(config[CONF_EQUAIZATION_VOLTAGE]))
+    if config.get(CONF_EQUALIZATION_VOLTAGE) is not None:
+        cg.add(var.set_equalization_voltage(config[CONF_EQUALIZATION_VOLTAGE]))
 
-        if config.get(CONF_EQUAIZATION_TIME) is not None:
-            cg.add(var.set_equaization_time(config[CONF_EQUAIZATION_TIME]))
+        if config.get(CONF_EQUALIZATION_TIME) is not None:
+            cg.add(var.set_equalization_time(config[s]))
 
-        if config.get(CONF_EQUAIZATION_INTERVAL) is not None:
-            cg.add(var.set_equaization_interval(config[CONF_EQUAIZATION_INTERVAL]))
+        if config.get(CONF_EQUALIZATION_INTERVAL) is not None:
+            cg.add(var.set_equalization_interval(config[s]))
 
-        if config.get(CONF_EQUAIZATION_TIMEOUT) is not None:
-            cg.add(var.set_equaization_timeout(config[CONF_EQUAIZATION_TIMEOUT]))
+        if config.get(CONF_EQUALIZATION_TIMEOUT) is not None:
+            cg.add(var.set_equalization_timeout(config[CONF_EQUALIZATION_TIMEOUT]))
 
 
     if config.get(CONF_TARGET_SENSOR_VOLTAGE) is not None and config[CONF_TARGET_SENSOR_VOLTAGE]:

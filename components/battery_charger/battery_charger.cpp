@@ -15,7 +15,7 @@ void ChargerComponent::dump_config() {
   // Output voltage settings
   ESP_LOGCONFIG(TAG, "  Float Voltage: %0.2f V", this->float_voltage_.value_or(-1));
   ESP_LOGCONFIG(TAG, "  Absorption Voltage: %0.2f V", this->absorption_voltage_v_.value_or(-1));
-  ESP_LOGCONFIG(TAG, "  Equaization Voltage: %0.2f V", this->equaization_voltage_v_.value_or(-1));
+  ESP_LOGCONFIG(TAG, "  equalization Voltage: %0.2f V", this->equalization_voltage_v_.value_or(-1));
   ESP_LOGCONFIG(TAG, "  Absorption Restart Voltage: %0.2f V", this->absorption_restart_voltage_v_.value_or(-1));
   
   // Output current and voltage readings
@@ -26,8 +26,8 @@ void ChargerComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Absorption Timer: %d seconds", this->absorption_timer_.time_s);
   ESP_LOGCONFIG(TAG, "  Voltage Auto Recovery Delay: %d seconds", this->voltage_auto_recovery_delay_timer_.time_s);
   ESP_LOGCONFIG(TAG, "  Absorption Restart Time: %d seconds", this->absorption_restart_timer_.time_s);
-  ESP_LOGCONFIG(TAG, "  Equaization Timeout: %d seconds", this->equaization_timeout_timer_.time_s);
-  ESP_LOGCONFIG(TAG, "  Equaization Interval: %d seconds", this->equaization_interval_timer_.time_s);
+  ESP_LOGCONFIG(TAG, "  equalization Timeout: %d seconds", this->equalization_timeout_timer_.time_s);
+  ESP_LOGCONFIG(TAG, "  equalization Interval: %d seconds", this->equalization_interval_timer_.time_s);
   ESP_LOGCONFIG(TAG, "  Absorption Low Voltage Delay: %d seconds", this->absorption_low_voltage_timer_.time_s);
 
   // Output current charge state
@@ -38,8 +38,8 @@ void ChargerComponent::dump_config() {
       case ABSORPTION: charge_state_str = "ABSORPTION"; break;
       case BEFORE_FLOAT: charge_state_str = "BEFORE_FLOAT"; break;
       case FLOAT: charge_state_str = "FLOAT"; break;
-      case BEFORE_EQUAIZATION: charge_state_str = "BEFORE_EQUAIZATION"; break;
-      case EQUAIZATION: charge_state_str = "EQUAIZATION"; break;
+      case BEFORE_EQUALIZATION: charge_state_str = "BEFORE_equalization"; break;
+      case EQUALIZATION: charge_state_str = "equalization"; break;
       case ERROR: charge_state_str = "ERROR"; break;
       case BEFORE_ERROR: charge_state_str = "BEFORE_ERROR"; break;
       default: charge_state_str = "INVALID_STATE"; break;
@@ -150,9 +150,9 @@ void ChargerComponent::updateState() {
       } else {
         this->call_update_state_later(BEFORE_FLOAT);
       }
-      if (this->equaization_voltage_v_.has_value()) {
-        this->equaization_interval_timer_.start([this]() {
-          this->call_update_state_later(BEFORE_EQUAIZATION);
+      if (this->equalization_voltage_v_.has_value()) {
+        this->equalization_interval_timer_.start([this]() {
+          this->call_update_state_later(BEFORE_EQUALIZATION);
         });
       }
     break;
@@ -209,8 +209,8 @@ void ChargerComponent::updateState() {
           this->call_update_state_later(BEFORE_ABSORPTION);
         });
       }
-      this->equaization_timeout_timer_.stop();
-      this->equaization_timer_.stop();
+      this->equalization_timeout_timer_.stop();
+      this->equalization_timer_.stop();
 
       this->absorption_timer_.stop();
       this->absorption_low_voltage_timer_.stop();
@@ -230,49 +230,49 @@ void ChargerComponent::updateState() {
       }
 
     break;
-    case BEFORE_EQUAIZATION:
-      ESP_LOGD(TAG, "Charge status becoming EQUAIZATION");
+    case BEFORE_EQUALIZATION:
+      ESP_LOGD(TAG, "Charge status becoming equalization");
       this->absorption_restart_timer_.stop();
       this->absorption_timer_.stop();
       this->absorption_low_voltage_timer_.stop();
 
       if (this->voltage_target_sensor_ != nullptr) {
-        this->voltage_target_sensor_->publish_state(this->equaization_voltage_v_.value_or(0));
+        this->voltage_target_sensor_->publish_state(this->equalization_voltage_v_.value_or(0));
       }
       #ifdef USE_TEXT_SENSOR
       if (this->charge_state_sensor_ != nullptr) {
-        this->charge_state_sensor_->publish_state("EQUAIZATION");
+        this->charge_state_sensor_->publish_state("equalization");
       }
       #endif
 
-      this->equaization_timeout_timer_.start([this]() {
-        this->equaization_timer_.stop();
+      this->equalization_timeout_timer_.start([this]() {
+        this->equalization_timer_.stop();
       
-        this->equaization_interval_timer_.start([this]() {
-          this->call_update_state_later(BEFORE_EQUAIZATION);
+        this->equalization_interval_timer_.start([this]() {
+          this->call_update_state_later(BEFORE_EQUALIZATION);
         });
 
         this->call_update_state_later(BEFORE_FLOAT);
       });
-      this->call_update_state_later(EQUAIZATION);
+      this->call_update_state_later(EQUALIZATION);
     break;
-    case EQUAIZATION:
-      ESP_LOGV(TAG, "Charge status EQUAIZATION");
-      if (this->last_voltage_ >= this->equaization_voltage_v_.value_or(0)) {
-        ESP_LOGV(TAG, "Voltage level reaches equaization level: %.2f of %.2f", this->last_voltage_, this->equaization_voltage_v_.value_or(0));
+    case EQUALIZATION:
+      ESP_LOGV(TAG, "Charge status equalization");
+      if (this->last_voltage_ >= this->equalization_voltage_v_.value_or(0)) {
+        ESP_LOGV(TAG, "Voltage level reaches equalization level: %.2f of %.2f", this->last_voltage_, this->equalization_voltage_v_.value_or(0));
 
-        this->equaization_timer_.start([this]() {
-          ESP_LOGV(TAG, "Equaization is complete. Switching to FLOAT (setup equaization_interval)");
-          this->equaization_interval_timer_.start([this]() {
-            this->call_update_state_later(BEFORE_EQUAIZATION);
+        this->equalization_timer_.start([this]() {
+          ESP_LOGV(TAG, "equalization is complete. Switching to FLOAT (setup equalization_interval)");
+          this->equalization_interval_timer_.start([this]() {
+            this->call_update_state_later(BEFORE_EQUALIZATION);
           });
-          this->equaization_timeout_timer_.stop();
+          this->equalization_timeout_timer_.stop();
           this->call_update_state_later(BEFORE_FLOAT);
         });
       } else {
-        ESP_LOGV(TAG, "Voltage level is below equaization: %.2f of %.2f", this->last_voltage_, this->equaization_voltage_v_.value_or(0));
+        ESP_LOGV(TAG, "Voltage level is below equalization: %.2f of %.2f", this->last_voltage_, this->equalization_voltage_v_.value_or(0));
 
-        this->equaization_timer_.stop();
+        this->equalization_timer_.stop();
       }
     break;
     case BEFORE_ERROR:
@@ -281,9 +281,9 @@ void ChargerComponent::updateState() {
       this->absorption_timer_.stop();
       this->absorption_low_voltage_timer_.stop();
 
-      this->equaization_timer_.stop();
-      this->equaization_interval_timer_.stop();
-      this->equaization_timeout_timer_.stop();
+      this->equalization_timer_.stop();
+      this->equalization_interval_timer_.stop();
+      this->equalization_timeout_timer_.stop();
 
       if (this->voltage_target_sensor_ != nullptr) {
         this->voltage_target_sensor_->publish_state(0);

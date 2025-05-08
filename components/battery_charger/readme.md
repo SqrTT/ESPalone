@@ -23,7 +23,6 @@ external_components:
     components: ['battery_charger']
 ```
 
-```
 
 ## Configuration Options
 
@@ -43,10 +42,10 @@ external_components:
 | `absorption_restart_voltage` | Voltage | Optional | Voltage threshold below which to restart absorption stage |
 | `absorption_restart_time` | Time | Optional | Interval after which to automatically restart absorption from float |
 | `absorption_low_voltage_delay` | Time | `1min` | Delay before switching to absorption after voltage drops below restart threshold |
-| `equaization_voltage` | Voltage | Optional | Target voltage during equalization stage |
-| `equaization_time` | Time | `1h` | Duration of the equalization stage |
-| `equaization_interval` | Time | `7d` | Interval between equalization cycles |
-| `equaization_timeout` | Time | `3h` | Maximum time to attempt reaching equalization voltage |
+| `equalization_voltage` | Voltage | Optional | Target voltage during equalization stage |
+| `equalization_time` | Time | `1h` | Duration of the equalization stage |
+| `equalization_interval` | Time | `7d` | Interval between equalization cycles |
+| `equalization_timeout` | Time | `3h` | Maximum time to attempt reaching equalization voltage |
 
 ## Example: Lead Acid Battery (12V)
 
@@ -64,10 +63,10 @@ battery_charger:
   voltage_max: 15.0V
   voltage_min: 10.5V
   voltage_auto_recovery_delay: 5min
-  equaization_voltage: 14.8V
-  equaization_time: 2h
-  equaization_interval: 30d
-  equaization_timeout: 5h
+  equalization_voltage: 14.8V
+  equalization_time: 2h
+  equalization_interval: 30d
+  equalization_timeout: 5h
   target_voltage_sensor:
     id: target_voltage
     name: "Target Charging Voltage"
