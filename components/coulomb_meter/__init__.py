@@ -27,11 +27,13 @@ CONF_CHARGE_LEVEL_SENSOR = "charge_level_sensor"
 CONF_CHARGE_IN_SENSOR = "charge_in_sensor"
 CONF_CHARGE_OUT_SENSOR = "charge_out_sensor"
 CONF_CHARGE_REMAINING_SENSOR = "charge_remaining_sensor"
+CONF_CHARGE_CALCULATED_SENSOR = "charge_calculated_sensor"
 
 CONF_ENERGY_LEVEL_SENSOR = "energy_level_sensor"
 CONF_ENERGY_REMAINING_SENSOR = "energy_remaining_sensor"
 CONF_ENERGY_IN_SENSOR = "energy_in_sensor"
 CONF_ENERGY_OUT_SENSOR = "energy_out_sensor"
+CONF_ENERGY_CALCULATED_SENSOR = "energy_calculated_sensor"
 
 CONF_CHARGE_TIME_REMAINING_SENSOR = "charge_time_remaining_sensor"
 CONF_DISCHARGE_TIME_REMAINING_SENSOR = "discharge_time_remaining_sensor"
@@ -50,12 +52,12 @@ COULOMB_SCHEMA = cv.Schema({
 
     cv.Optional(CONF_CHARGE_TIME_REMAINING_SENSOR): sensor.sensor_schema(
         unit_of_measurement=UNIT_MINUTE,
-        accuracy_decimals=2,
+        accuracy_decimals=0,
         icon=ICON_TIMER
     ),
     cv.Optional(CONF_DISCHARGE_TIME_REMAINING_SENSOR): sensor.sensor_schema(
         unit_of_measurement=UNIT_MINUTE,
-        accuracy_decimals=2,
+        accuracy_decimals=0,
         icon=ICON_TIMER
     ),
 
@@ -65,6 +67,10 @@ COULOMB_SCHEMA = cv.Schema({
         accuracy_decimals=0,
     ),
 
+    cv.Optional(CONF_CHARGE_CALCULATED_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_AMPERE_HOURS,
+        accuracy_decimals=3
+    ),
     cv.Optional(CONF_CHARGE_IN_SENSOR): sensor.sensor_schema(
         unit_of_measurement=UNIT_AMPERE_HOURS,
         accuracy_decimals=3,
@@ -100,6 +106,10 @@ COULOMB_SCHEMA = cv.Schema({
         unit_of_measurement=UNIT_WATT_HOURS,
         accuracy_decimals=3,
         state_class=STATE_CLASS_TOTAL_INCREASING,
+    ),
+    cv.Optional(CONF_ENERGY_CALCULATED_SENSOR): sensor.sensor_schema(
+        unit_of_measurement=UNIT_WATT_HOURS,
+        accuracy_decimals=3
     ),
 })
 coulomb_meter_ns = cg.esphome_ns.namespace("coulomb_meter")
@@ -141,6 +151,10 @@ async def setup_coulomb(var, config):
     if conf := config.get(CONF_CHARGE_REMAINING_SENSOR):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_charge_remaining_sensor(sens))
+
+    if conf := config.get(CONF_CHARGE_CALCULATED_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_charge_calculated_sensor(sens))
     
     ### WH sensors
     if conf := config.get(CONF_ENERGY_LEVEL_SENSOR):
@@ -158,6 +172,10 @@ async def setup_coulomb(var, config):
     if conf := config.get(CONF_ENERGY_OUT_SENSOR):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_energy_out_sensor(sens))
+
+    if conf := config.get(CONF_ENERGY_CALCULATED_SENSOR):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_energy_calculated_sensor(sens))
 
 CONFIG_SCHEMA = cv.Schema({})
     

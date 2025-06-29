@@ -109,11 +109,13 @@ class CoulombMeter : public PollingComponent {
   void set_charge_out_sensor(sensor::Sensor *sensor) { charge_out_sensor_ = sensor; };
   void set_charge_in_sensor(sensor::Sensor *sensor) { charge_in_sensor_ = sensor; };
   void set_charge_remaining_sensor(sensor::Sensor *sensor) { charge_remaining_sensor_ = sensor; };
+  void set_charge_calculated_sensor(sensor::Sensor *sensor) { charge_calculated_sensor_ = sensor; };
 
   void set_energy_level_sensor(sensor::Sensor *sensor) { energy_level_sensor_ = sensor; };
   void set_energy_remaining_sensor(sensor::Sensor *sensor) { energy_remaining_sensor_ = sensor; };
   void set_energy_in_sensor(sensor::Sensor *sensor) { energy_in_sensor_ = sensor; };
   void set_energy_out_sensor(sensor::Sensor *sensor) { energy_out_sensor_ = sensor; };
+  void set_energy_calculated_sensor(sensor::Sensor *sensor) { energy_calculated_sensor_ = sensor; };
 
   void set_charge_time_remaining_sensor(sensor::Sensor *sensor) { charge_time_remaining_sensor_ = sensor; };
   void set_discharge_time_remaining_sensor(sensor::Sensor *sensor) { discharge_time_remaining_sensor_ = sensor; };
@@ -161,17 +163,19 @@ class CoulombMeter : public PollingComponent {
     uint64_t cumulative_charge_out_c_{0};
     uint64_t cumulative_energy_out_j_{0};
     optional<uint64_t> cumulative_at_full_discharge_c_;
-    //optional<uint64_t> cumulative_at_full_discharge_j_;
+    optional<uint64_t> cumulative_at_full_discharge_j_;
     
     sensor::Sensor *charge_level_sensor_{nullptr};
     sensor::Sensor *charge_out_sensor_{nullptr};
     sensor::Sensor *charge_in_sensor_{nullptr};
     sensor::Sensor *charge_remaining_sensor_{nullptr};
+    sensor::Sensor *charge_calculated_sensor_{nullptr};
 
     sensor::Sensor *energy_level_sensor_{nullptr};
     sensor::Sensor *energy_remaining_sensor_{nullptr};
     sensor::Sensor *energy_in_sensor_{nullptr};
     sensor::Sensor *energy_out_sensor_{nullptr};
+    sensor::Sensor *energy_calculated_sensor_{nullptr};
 
     sensor::Sensor *charge_time_remaining_sensor_{nullptr};
     sensor::Sensor *discharge_time_remaining_sensor_{nullptr};
@@ -187,10 +191,12 @@ class CoulombMeter : public PollingComponent {
       CHARGE_OUT_SENSOR,
       CHARGE_IN_SENSOR,
       CHARGE_REMAINING_SENSOR,
+      CHARGE_CALCULATED_SENSOR,
       ENERGY_LEVEL_SENSOR,
       ENERGY_IN_SENSOR,
       ENERGY_OUT_SENSOR,
       ENERGY_REMAINING_SENSOR,
+      ENERGY_CALCULATED_SENSOR,
       TIME_REMAINING_SENSOR,
     } meter_state_{State::NOT_INITIALIZED};
 };

@@ -188,9 +188,10 @@ namespace esphome {
           0,
           100
         );
-        if (current_charge_level_ < 99) {
+        if (full_charge_reached_ && current_charge_level_ < 99) {
           full_charge_reached_ = false;
-        } else if (current_charge_level_ > 1) {
+        }
+        if (full_discharge_reached_ && current_charge_level_ > 1) {
           full_discharge_reached_ = false;
         }
       }
@@ -218,38 +219,66 @@ namespace esphome {
           this->current_charge_c_ = full_charge_calculated_c_.value_or(full_capacity_c_);
           cumulative_at_fill_charge_c_ = this->cumulative_charge_in_c_;
           cumulative_at_full_discharge_c_ = this->cumulative_charge_out_c_; 
+          cumulative_at_fill_charge_j_ = this->cumulative_energy_in_j_;
+          cumulative_at_full_discharge_j_ = this->cumulative_energy_out_j_;
         });
       } else {
         fully_charge_time_.stop();
       }
 
       if (voltage <= fully_discharge_voltage_v_) {
-        fully_discharge_timer_.start([this]() {
-        full_discharge_reached_ = true;
-        this->current_charge_c_ = 0;
-        if (cumulative_at_fill_charge_c_.has_value() && cumulative_at_full_discharge_c_.has_value()) {
-          const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_fill_charge_c_.value();
-          const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_discharge_c_.value();
-          const auto capacity = charge_delta + discharge_delta;
-          ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
-          ESP_LOGD(TAG, "Charge delta: %i", charge_delta);
-          ESP_LOGD(TAG, "Discharge delta: %i", discharge_delta);
-          if (capacity > 0) {
-            full_charge_calculated_c_ = capacity;
-            int32_t stored_capacity;
-            if (pref_full_charge_calculated_c_.load(&stored_capacity)) {
-              if (stored_capacity != capacity) {
-                ESP_LOGD(TAG, "Saving full charge: %i", capacity);
+          fully_discharge_timer_.start([this]() {
+          full_discharge_reached_ = true;
+          this->current_charge_c_ = 0;
+          if (cumulative_at_fill_charge_c_.has_value() && cumulative_at_full_discharge_c_.has_value()) {
+            const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_fill_charge_c_.value();
+            const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_discharge_c_.value();
+            const auto capacity = charge_delta + discharge_delta;
+
+            ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
+            ESP_LOGD(TAG, "Charge delta: %i", charge_delta);
+            ESP_LOGD(TAG, "Discharge delta: %i", discharge_delta);
+            if (capacity > 0) {
+              full_charge_calculated_c_ = capacity;
+              int32_t stored_capacity;
+              if (pref_full_charge_calculated_c_.load(&stored_capacity)) {
+                if (stored_capacity != capacity) {
+                  ESP_LOGD(TAG, "Saving full charge: %i", capacity);
+                  pref_full_charge_calculated_c_.save(&capacity);
+                }
+              } else {
                 pref_full_charge_calculated_c_.save(&capacity);
               }
+              ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
             } else {
-              pref_full_charge_calculated_c_.save(&capacity);
+              ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
             }
-            ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
-          } else {
-            ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
           }
-        } });
+          if (cumulative_at_fill_charge_j_.has_value() && cumulative_at_full_discharge_j_.has_value()) {
+            const auto energy_delta = cumulative_energy_in_j_ - cumulative_at_fill_charge_j_.value();
+            const auto discharge_delta = cumulative_energy_out_j_ - cumulative_at_full_discharge_j_.value();
+            const auto energy_capacity = energy_delta + discharge_delta;
+
+            ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
+            ESP_LOGD(TAG, "Energy delta: %i", energy_delta);
+            ESP_LOGD(TAG, "Discharge delta: %i", discharge_delta);
+            if (energy_capacity > 0) {
+              full_energy_calculated_j_ = energy_capacity;
+              int32_t stored_energy;
+              if (pref_full_energy_calculated_j_.load(&stored_energy)) {
+                if (stored_energy != energy_capacity) {
+                  ESP_LOGD(TAG, "Saving full energy: %i", energy_capacity);
+                  pref_full_energy_calculated_j_.save(&energy_capacity);
+                }
+              } else {
+                pref_full_energy_calculated_j_.save(&energy_capacity);
+              }
+              ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
+            } else {
+              ESP_LOGW(TAG, "Energy capacity invalid: %i", energy_capacity);
+            }
+          }
+        });
       } else {
         fully_discharge_timer_.stop();
       }
@@ -302,9 +331,22 @@ namespace esphome {
 
           return false;
         case State::CHARGE_REMAINING_SENSOR:
-          this->meter_state_ = State::ENERGY_LEVEL_SENSOR;
+          this->meter_state_ = State::CHARGE_CALCULATED_SENSOR;
 
-          publish_state_(charge_remaining_sensor_, this->cumulative_charge_in_c_ / 3600.0f);
+          publish_state_(charge_remaining_sensor_, this->current_charge_c_ / 3600.0f);
+          return false;
+        case State::CHARGE_CALCULATED_SENSOR:
+          this->meter_state_ = State::ENERGY_LEVEL_SENSOR;
+          if (this->full_charge_calculated_c_.has_value()) {
+            ESP_LOGD(TAG, "Charge calculated sensor: %i", this->full_charge_calculated_c_.value());
+          } else {
+            ESP_LOGD(TAG, "Charge calculated sensor: HAS NO VALUE");
+          }
+          if (this->charge_calculated_sensor_ != nullptr && full_charge_calculated_c_.has_value()) {
+
+            publish_state_(this->charge_calculated_sensor_, full_charge_calculated_c_.value() / 3600.0f);
+          }
+          
           return false;
         case State::ENERGY_LEVEL_SENSOR:
           this->meter_state_ = State::ENERGY_OUT_SENSOR;
@@ -340,8 +382,22 @@ namespace esphome {
 
           return false;
         case State::ENERGY_REMAINING_SENSOR:
-          this->meter_state_ = State::TIME_REMAINING_SENSOR;
+          this->meter_state_ = State::ENERGY_CALCULATED_SENSOR;
           publish_state_(energy_remaining_sensor_, this->current_energy_j_ / 3600.0f);
+          return false;
+        case State::ENERGY_CALCULATED_SENSOR:
+          this->meter_state_ = State::TIME_REMAINING_SENSOR;
+           
+
+          // if (this->full_energy_calculated_j_.has_value()) {
+          //   ESP_LOGD(TAG, "Energy calculated sensor: %i", this->full_energy_calculated_j_.value());
+          // } else {
+          //   ESP_LOGD(TAG, "Energy calculated sensor: HAS NO VALUE");
+          // }
+          if (this->energy_calculated_sensor_ != nullptr && full_energy_calculated_j_.has_value()) {
+            publish_state_(this->energy_calculated_sensor_, full_energy_calculated_j_.value() / 3600.0f);
+          }
+
           return false;
         case State::TIME_REMAINING_SENSOR:
           this->meter_state_ = State::IDLE;
@@ -358,7 +414,7 @@ namespace esphome {
               auto const energy_to_full = full_energy_calculated_j_.value_or(full_energy_j_) - this->current_energy_j_;
               const auto time_remaining = energy_to_full / avg_energy_usage_minutes;
               
-              publish_state_(charge_time_remaining_sensor_, std::min(9999.999f, time_remaining));
+              publish_state_(charge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
 
               if (discharge_time_remaining_sensor_ != nullptr && !std::isnan(discharge_time_remaining_sensor_->state)) {
                 publish_state_(discharge_time_remaining_sensor_, NAN);
@@ -369,7 +425,7 @@ namespace esphome {
               if (charge_time_remaining_sensor_ != nullptr && !std::isnan(charge_time_remaining_sensor_->state)) {
                 publish_state_(charge_time_remaining_sensor_, NAN);
               }
-              publish_state_(discharge_time_remaining_sensor_, std::min(9999.999f, time_remaining));
+              publish_state_(discharge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
             }
 
           }
