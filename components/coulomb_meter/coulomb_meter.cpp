@@ -1,5 +1,3 @@
-
-
 #include "coulomb_meter.h"
 
 namespace esphome {
@@ -15,6 +13,12 @@ namespace esphome {
         return out_min;
       if (x >= in_max)
         return out_max;
+
+      // Prevent division by zero
+      if (in_max == in_min) {
+          ESP_LOGE(TAG, "clamp_map: Division by zero detected (in_max == in_min)");
+          return out_min; // Return a safe default value
+      }
       return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
     }
 
@@ -213,10 +217,14 @@ namespace esphome {
         current_energy_j_ = full_energy_calculated_j_.value_or(full_energy_j_);
       }
 
+      // is fully charged?
       if (voltage >= fully_charge_voltage_ && (fully_charge_current_.has_value() ? this->get_current() <= fully_charge_current_.value() : true)) {
         fully_charge_time_.start([this]() {
           full_charge_reached_ = true;
           this->current_charge_c_ = full_charge_calculated_c_.value_or(full_capacity_c_);
+          this->current_energy_j_ = full_energy_calculated_j_.value_or(full_energy_j_);
+          ESP_LOGD(TAG, "Full charge reached: %i", this->current_charge_c_);
+
           cumulative_at_fill_charge_c_ = this->cumulative_charge_in_c_;
           cumulative_at_full_discharge_c_ = this->cumulative_charge_out_c_; 
           cumulative_at_fill_charge_j_ = this->cumulative_energy_in_j_;
@@ -226,10 +234,13 @@ namespace esphome {
         fully_charge_time_.stop();
       }
 
+
+      // is fully discharged?
       if (voltage <= fully_discharge_voltage_v_) {
           fully_discharge_timer_.start([this]() {
           full_discharge_reached_ = true;
           this->current_charge_c_ = 0;
+          // calculate capacity based on charge
           if (cumulative_at_fill_charge_c_.has_value() && cumulative_at_full_discharge_c_.has_value()) {
             const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_fill_charge_c_.value();
             const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_discharge_c_.value();
@@ -254,6 +265,7 @@ namespace esphome {
               ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
             }
           }
+          // calculate energy based on energy
           if (cumulative_at_fill_charge_j_.has_value() && cumulative_at_full_discharge_j_.has_value()) {
             const auto energy_delta = cumulative_energy_in_j_ - cumulative_at_fill_charge_j_.value();
             const auto discharge_delta = cumulative_energy_out_j_ - cumulative_at_full_discharge_j_.value();
@@ -280,12 +292,12 @@ namespace esphome {
           }
         });
       } else {
+        // if voltage is above fully discharge voltage, stop timer
         fully_discharge_timer_.stop();
       }
     }
 
     bool CoulombMeter::updateSensors() {
-
       switch (this->meter_state_) {
         case State::NOT_INITIALIZED:
           this->meter_state_ = State::SETUP;
@@ -342,8 +354,7 @@ namespace esphome {
           } else {
             ESP_LOGD(TAG, "Charge calculated sensor: HAS NO VALUE");
           }
-          if (this->charge_calculated_sensor_ != nullptr && full_charge_calculated_c_.has_value()) {
-
+          if (full_charge_calculated_c_.has_value()) {
             publish_state_(this->charge_calculated_sensor_, full_charge_calculated_c_.value() / 3600.0f);
           }
           
@@ -394,7 +405,7 @@ namespace esphome {
           // } else {
           //   ESP_LOGD(TAG, "Energy calculated sensor: HAS NO VALUE");
           // }
-          if (this->energy_calculated_sensor_ != nullptr && full_energy_calculated_j_.has_value()) {
+          if (full_energy_calculated_j_.has_value()) {
             publish_state_(this->energy_calculated_sensor_, full_energy_calculated_j_.value() / 3600.0f);
           }
 
@@ -406,7 +417,7 @@ namespace esphome {
             const auto avg_energy = this->energy_usage_average_.get();
             const auto avg_energy_usage_minutes = avg_energy * (60000.0f / TIME_REMAINING);
 
-            if (avg_energy_usage_minutes == 0) {
+            if (std::abs(avg_energy_usage_minutes) < 0.1) {
               publish_state_(charge_time_remaining_sensor_, NAN);
               publish_state_(discharge_time_remaining_sensor_, NAN);
 
@@ -416,8 +427,10 @@ namespace esphome {
               
               publish_state_(charge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
 
-              if (discharge_time_remaining_sensor_ != nullptr && !std::isnan(discharge_time_remaining_sensor_->state)) {
-                publish_state_(discharge_time_remaining_sensor_, NAN);
+              if (discharge_time_remaining_sensor_ != nullptr) {
+                if (!std::isnan(discharge_time_remaining_sensor_->state)) {
+                  publish_state_(discharge_time_remaining_sensor_, NAN);
+                }
               }
             } else {
               const auto time_remaining = this->current_energy_j_ / -avg_energy_usage_minutes;

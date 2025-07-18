@@ -124,7 +124,7 @@ void INA226Component::update() {
 
 void INA226Component::loop() {
 
-  const auto now = millis();
+  
   if (reads_count_++ == 0) {
     uint16_t raw_bus_voltage;
     if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
@@ -137,6 +137,7 @@ void INA226Component::loop() {
     if (reads_count_ > 20) {
       reads_count_ = 0;
     };
+    const auto now = millis();
     const auto current = this->read_current_ma_();
     this->latest_current_ = current / 1000.0f;
     const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
@@ -170,8 +171,6 @@ void INA226Component::loop() {
 
       if (this->current_sensor_ != nullptr) {
         this->current_sensor_->publish_state(this->latest_current_);
-      } else {
-        this->loop();
       }
       break;
     case State::DATA_COLLECTION_VOLTAGE:
@@ -179,8 +178,6 @@ void INA226Component::loop() {
 
       if (this->bus_voltage_sensor_ != nullptr && latest_voltage_.has_value()) {
         this->bus_voltage_sensor_->publish_state(this->latest_voltage_.value_or(0));
-      } else {
-        this->loop();
       }
       
       break;
@@ -189,8 +186,6 @@ void INA226Component::loop() {
       this->state_ = State::DATA_COLLECTION_SHUNT_VOLTAGE;
       if (this->power_sensor_ != nullptr && this->latest_voltage_.has_value()) {
         this->power_sensor_->publish_state(this->latest_voltage_.value_or(0) * this->latest_current_);
-      } else {
-        this->loop();
       }
 
       break;
@@ -206,8 +201,6 @@ void INA226Component::loop() {
         float shunt_voltage_v = this->twos_complement_(raw_shunt_voltage, 16);
         shunt_voltage_v *= 0.0000025f;
         this->shunt_voltage_sensor_->publish_state(shunt_voltage_v);
-      } else {
-        this->loop();
       }
       break;
     case State::DATA_REPORT_COULUMB:
@@ -215,8 +208,6 @@ void INA226Component::loop() {
 
       if (this->charge_coulombs_sensor_ != nullptr) {
         this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
-      } else {
-        this->loop();
       }
       #ifdef ESPHOME_LOG_HAS_VERBOSE
       {
