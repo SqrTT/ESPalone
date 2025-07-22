@@ -94,6 +94,7 @@ class CoulombMeter : public PollingComponent {
   void dump_config() override;
   float get_setup_priority() const override;
   // void loop() override;
+  void on_shutdown() override;
 
   void set_fully_charge_voltage(float voltage) { fully_charge_voltage_ = voltage; };
   void set_fully_charge_current(float voltage) { fully_charge_current_ = voltage; };
@@ -146,24 +147,34 @@ class CoulombMeter : public PollingComponent {
     int32_t full_capacity_c_{0};
     int32_t full_energy_j_{0};
     optional<int32_t> full_charge_calculated_c_;
-    ESPPreferenceObject pref_full_charge_calculated_c_;
+    ESPPreferenceObject flash_full_charge_calculated_c_{nullptr};
     optional<int32_t> full_energy_calculated_j_;
-    ESPPreferenceObject pref_full_energy_calculated_j_;
+    ESPPreferenceObject flash_full_energy_calculated_j_{nullptr};
     int32_t current_charge_c_{0};
-    ESPPreferenceObject pref_current_charge_c_;
+    ESPPreferenceObject rtc_current_charge_c_{nullptr};
     int32_t current_energy_j_{0};
-    ESPPreferenceObject pref_current_energy_j_;
+    ESPPreferenceObject rtc_current_energy_j_{nullptr};
 
     int64_t previous_charge_c_{0};
     int64_t previous_energy_j_{0};
+
     uint64_t cumulative_charge_in_c_{0};
     uint64_t cumulative_energy_in_j_{0};
-    optional<uint64_t> cumulative_at_fill_charge_c_;
-    optional<uint64_t> cumulative_at_fill_charge_j_;
     uint64_t cumulative_charge_out_c_{0};
     uint64_t cumulative_energy_out_j_{0};
-    optional<uint64_t> cumulative_at_full_discharge_c_;
-    optional<uint64_t> cumulative_at_full_discharge_j_;
+    ESPPreferenceObject rtc_cumulative_charge_in_c_{nullptr};
+    ESPPreferenceObject rtc_cumulative_energy_in_j_{nullptr};
+    ESPPreferenceObject rtc_cumulative_charge_out_c_{nullptr};
+    ESPPreferenceObject rtc_cumulative_energy_out_j_{nullptr};
+
+    optional<uint64_t> cumulative_at_full_in_c_;
+    optional<uint64_t> cumulative_at_full_in_j_;
+    optional<uint64_t> cumulative_at_full_out_c_;
+    optional<uint64_t> cumulative_at_full_out_j_;
+    ESPPreferenceObject rtc_cumulative_at_full_in_c_{nullptr};
+    ESPPreferenceObject rtc_cumulative_at_full_in_j_{nullptr};
+    ESPPreferenceObject rtc_cumulative_at_full_out_c_{nullptr};
+    ESPPreferenceObject rtc_cumulative_at_full_out_j_{nullptr};
     
     sensor::Sensor *charge_level_sensor_{nullptr};
     sensor::Sensor *charge_out_sensor_{nullptr};
@@ -199,6 +210,8 @@ class CoulombMeter : public PollingComponent {
       ENERGY_CALCULATED_SENSOR,
       TIME_REMAINING_SENSOR,
     } meter_state_{State::NOT_INITIALIZED};
+
+    void storeCounters();
 };
 
 }  // namespace coulomb_meter

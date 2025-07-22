@@ -1,5 +1,6 @@
 #include "coulomb_meter.h"
 
+// .platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-addr2line -pfiaC -e esphome_config/.esphome/build/ina226coulomb/.pioenvs/ina226coulomb/firmware.elf  0x4022b8e2
 namespace esphome {
   namespace coulomb_meter {
 
@@ -35,85 +36,108 @@ namespace esphome {
           this->energy_usage_average_.add(delta_energy);
         });
       }
-      pref_current_charge_c_ = global_preferences->make_preference<int32_t>(fnv1_hash("CoulombMeter_current_charge_c"), true);
-      pref_current_energy_j_ = global_preferences->make_preference<int32_t>(fnv1_hash("CoulombMeter_current_energy_j"), true);
-      pref_full_charge_calculated_c_ = global_preferences->make_preference<int32_t>(fnv1_hash("CoulombMeter_full_charge_calculated_c"), true);
-      pref_full_energy_calculated_j_ = global_preferences->make_preference<int32_t>(fnv1_hash("CoulombMeter_full_energy_calculated_j"), true);
+
+      rtc_current_charge_c_ = global_preferences->make_preference<int32_t>(fnv1_hash("current_charge_c"), false);
+      rtc_current_energy_j_ = global_preferences->make_preference<int32_t>(fnv1_hash("current_energy_j"), false);
+
+      rtc_cumulative_at_full_in_c_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_at_full_in_c_"), false);
+      rtc_cumulative_at_full_in_j_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_at_full_in_j_"), false);
+      rtc_cumulative_at_full_out_c_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_at_full_out_c_"), false);
+      rtc_cumulative_at_full_out_j_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_at_full_out_j_"), false);
       
-      int32_t charge_calculated_c_;
-      if (pref_full_charge_calculated_c_.load(&charge_calculated_c_)) {
+      rtc_cumulative_charge_in_c_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_charge_in_c_"), false);
+      rtc_cumulative_energy_in_j_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_energy_in_j_"), false);
+      rtc_cumulative_charge_out_c_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_charge_out_c_"), false);
+      rtc_cumulative_energy_out_j_ = global_preferences->make_preference<uint64_t>(fnv1_hash("cumulative_energy_out_j_"), false);
+
+      flash_full_charge_calculated_c_ = global_preferences->make_preference<int32_t>(fnv1_hash("CoulombMeter_full_charge_calculated_c"), true);
+      flash_full_energy_calculated_j_ = global_preferences->make_preference<int32_t>(fnv1_hash("CoulombMeter_full_energy_calculated_j"), true);
+      
+      // recovery from rtc memory
+      uint64_t tmp_cumulative_at_full_in_c_ = 0;
+      if (rtc_cumulative_at_full_in_c_.load(&tmp_cumulative_at_full_in_c_)) {
+        cumulative_at_full_in_c_ = tmp_cumulative_at_full_in_c_;
+      }
+      
+      uint64_t tmp_cumulative_at_full_in_j_ = 0;
+      if (rtc_cumulative_at_full_in_j_.load(&tmp_cumulative_at_full_in_j_)) {
+        cumulative_at_full_in_j_ = tmp_cumulative_at_full_in_j_;
+      }
+
+      uint64_t tmp_cumulative_at_full_out_c_ = 0;
+      if (rtc_cumulative_at_full_out_c_.load(&tmp_cumulative_at_full_out_c_)) {
+        cumulative_at_full_out_c_ = tmp_cumulative_at_full_out_c_;
+      }
+
+      uint64_t tmp_cumulative_at_full_out_j_ = 0;
+      if (rtc_cumulative_at_full_out_j_.load(&tmp_cumulative_at_full_out_j_)) {
+        cumulative_at_full_out_j_ = tmp_cumulative_at_full_out_j_;
+      }
+
+      uint64_t tmp_cumulative_charge_in_c_ = 0;
+      if (rtc_cumulative_charge_in_c_.load(&tmp_cumulative_charge_in_c_)) {
+        cumulative_charge_in_c_ = tmp_cumulative_charge_in_c_;
+      }
+
+      uint64_t tmp_cumulative_energy_in_j_ = 0;
+      if (rtc_cumulative_energy_in_j_.load(&tmp_cumulative_energy_in_j_)) {
+        cumulative_energy_in_j_ = tmp_cumulative_energy_in_j_;
+      }
+
+      uint64_t tmp_cumulative_charge_out_c_ = 0;
+      if (rtc_cumulative_charge_out_c_.load(&tmp_cumulative_charge_out_c_)) {
+        cumulative_charge_out_c_ = tmp_cumulative_charge_out_c_;
+      }
+
+      uint64_t tmp_cumulative_energy_out_j_ = 0;
+      if (rtc_cumulative_energy_out_j_.load(&tmp_cumulative_energy_out_j_)) {
+        cumulative_energy_out_j_ = tmp_cumulative_energy_out_j_;
+      }
+
+      int32_t charge_calculated_c_ = 0;
+      if (flash_full_charge_calculated_c_.load(&charge_calculated_c_)) {
         ESP_LOGD(TAG, "Loaded full charge from flash: %i", charge_calculated_c_);
         full_charge_calculated_c_ = charge_calculated_c_;
       } else {
         ESP_LOGD(TAG, "Failed to load full charge, use default");
       };
       int32_t energy_calculated_j_;
-      if (pref_full_energy_calculated_j_.load(&energy_calculated_j_)) {
+      if (flash_full_energy_calculated_j_.load(&energy_calculated_j_)) {
         ESP_LOGD(TAG, "Loaded full energy from flash: %i", energy_calculated_j_);
         full_energy_calculated_j_ = energy_calculated_j_;
       } else {
         ESP_LOGD(TAG, "Failed to load full energy, use default");
       };
 
-      this->set_interval("saveCounters", 15 * 60 * 1000, [this]() { 
-        // store energy if significant change every 15min (to reduce flash wear)
-        int32_t stored_energy_value;
+      int32_t charge;
+      if (rtc_current_charge_c_.load(&charge)) {
+        ESP_LOGD(TAG, "Loaded current charge from rtc: %i", charge);
+        current_charge_c_ = charge;
+      }
 
-        if (pref_current_energy_j_.load(&stored_energy_value)) {
-          const auto current_stored_energy_level_ = clamp_map(
-            stored_energy_value,
-            0,
-            full_energy_calculated_j_.value_or(full_energy_j_),
-            0,
-            100
-          );
-          const auto current_energy_level_ = clamp_map(
-            current_energy_j_,
-            0,
-            full_energy_calculated_j_.value_or(full_energy_j_),
-            0,
-            100
-          );
-          if (current_energy_level_ != current_stored_energy_level_) {
-            ESP_LOGD(TAG, "Saving current energy: %i", current_energy_j_);
-            pref_current_energy_j_.save(&current_energy_j_);
-          } else {
-            ESP_LOGD(TAG, "Current energy not changed enought: %i (in flash %i)", current_energy_j_, stored_energy_value);
-          }
-        } else {
-          ESP_LOGD(TAG, "Saving current energy: %i", current_energy_j_);
-          pref_current_energy_j_.save(&current_energy_j_);
-        }
-        // store charge if significant change every 15min
-        int32_t stored_charge_value;
+      int32_t energy;
+      if (rtc_current_energy_j_.load(&energy)) {
+        ESP_LOGD(TAG, "Loaded current energy from rtc: %i", energy);
+        current_energy_j_ = energy;
+      }
 
-        if (pref_current_charge_c_.load(&stored_charge_value)) {
-          const auto current_stored_charge_level_ = clamp_map(
-            stored_charge_value,
-            0,
-            full_charge_calculated_c_.value_or(full_capacity_c_),
-            0,
-            100
-          );
-          const auto current_charge_level_ = clamp_map(
-            current_charge_c_,
-            0,
-            full_charge_calculated_c_.value_or(full_capacity_c_),
-            0,
-            100
-          );
-          if (current_charge_level_ != current_stored_charge_level_) {
-            ESP_LOGD(TAG, "Saving current charge: %i", current_charge_c_);
-            pref_current_charge_c_.save(&current_charge_c_);
-          } else {
-            ESP_LOGD(TAG, "Current charge not changed enought: %i (in flash %i)", current_charge_c_, stored_charge_value);
-          }
-        } else {
-          ESP_LOGD(TAG, "Saving current charge: %i", current_charge_c_);
-          pref_current_charge_c_.save(&current_charge_c_);
-        }
-
+      this->set_interval("saveCounters", 15 * 1000, [this]() { 
+        this->storeCounters(); 
       });
+    }
+
+    void CoulombMeter::storeCounters() {
+      rtc_current_energy_j_.save(&current_energy_j_);
+      rtc_current_charge_c_.save(&current_charge_c_);
+
+      rtc_cumulative_charge_in_c_.save(&cumulative_charge_in_c_);
+      rtc_cumulative_energy_in_j_.save(&cumulative_energy_in_j_);
+      rtc_cumulative_charge_out_c_.save(&cumulative_charge_out_c_);
+      rtc_cumulative_energy_out_j_.save(&cumulative_energy_out_j_);
+    }
+
+    void CoulombMeter::on_shutdown() {
+      storeCounters();
     }
 
     void CoulombMeter::update() {
@@ -129,12 +153,8 @@ namespace esphome {
       const auto voltage = this->get_voltage();
 
       if (this->meter_state_ == State::SETUP) {
-        int32_t charge;
 
-        if (pref_current_charge_c_.load(&charge)) {
-          ESP_LOGD(TAG, "Loaded current charge from flash: %i", charge);
-          current_charge_c_ = charge;
-        } else {
+        if (current_charge_c_ == 0) {
           ESP_LOGD(TAG, "Failed to load current charge, use voltage to determinate charge level");
           // use initial charge based on voltage
           current_charge_c_ = clamp_map(
@@ -146,12 +166,7 @@ namespace esphome {
           );
         }
 
-        int32_t energy;
-
-        if (pref_current_energy_j_.load(&energy)) {
-          ESP_LOGD(TAG, "Loaded current energy from flasg: %i", energy);
-          current_energy_j_ = energy;
-        } else {
+        if (current_energy_j_ == 0) {
           ESP_LOGD(TAG, "Failed to load current energy, use voltage to determinate charge level");
           current_energy_j_ = clamp_map(
             voltage * 1000,
@@ -218,32 +233,36 @@ namespace esphome {
       }
 
       // is fully charged?
-      if (voltage >= fully_charge_voltage_ && (fully_charge_current_.has_value() ? this->get_current() <= fully_charge_current_.value() : true)) {
+      if (full_charge_reached_ == false && voltage >= fully_charge_voltage_ && (fully_charge_current_.has_value() ? this->get_current() <= fully_charge_current_.value() : true)) {
         fully_charge_time_.start([this]() {
           full_charge_reached_ = true;
           this->current_charge_c_ = full_charge_calculated_c_.value_or(full_capacity_c_);
           this->current_energy_j_ = full_energy_calculated_j_.value_or(full_energy_j_);
           ESP_LOGD(TAG, "Full charge reached: %i", this->current_charge_c_);
 
-          cumulative_at_fill_charge_c_ = this->cumulative_charge_in_c_;
-          cumulative_at_full_discharge_c_ = this->cumulative_charge_out_c_; 
-          cumulative_at_fill_charge_j_ = this->cumulative_energy_in_j_;
-          cumulative_at_full_discharge_j_ = this->cumulative_energy_out_j_;
+          cumulative_at_full_in_c_ = this->cumulative_charge_in_c_;
+          cumulative_at_full_out_c_ = this->cumulative_charge_out_c_; 
+          cumulative_at_full_in_j_ = this->cumulative_energy_in_j_;
+          cumulative_at_full_out_j_ = this->cumulative_energy_out_j_;
+
+          rtc_cumulative_at_full_in_c_.save(&cumulative_charge_in_c_);
+          rtc_cumulative_at_full_in_j_.save(&cumulative_energy_in_j_);
+          rtc_cumulative_at_full_out_c_.save(&cumulative_charge_out_c_);
+          rtc_cumulative_at_full_out_j_.save(&cumulative_energy_out_j_);
         });
       } else {
         fully_charge_time_.stop();
       }
 
-
       // is fully discharged?
-      if (voltage <= fully_discharge_voltage_v_) {
+      if (voltage <= fully_discharge_voltage_v_ && full_discharge_reached_ == false) {
           fully_discharge_timer_.start([this]() {
           full_discharge_reached_ = true;
           this->current_charge_c_ = 0;
           // calculate capacity based on charge
-          if (cumulative_at_fill_charge_c_.has_value() && cumulative_at_full_discharge_c_.has_value()) {
-            const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_fill_charge_c_.value();
-            const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_discharge_c_.value();
+          if (cumulative_at_full_in_c_.has_value() && cumulative_at_full_out_c_.has_value()) {
+            const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_full_in_c_.value();
+            const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_out_c_.value();
             const auto capacity = charge_delta + discharge_delta;
 
             ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
@@ -252,13 +271,13 @@ namespace esphome {
             if (capacity > 0) {
               full_charge_calculated_c_ = capacity;
               int32_t stored_capacity;
-              if (pref_full_charge_calculated_c_.load(&stored_capacity)) {
+              if (flash_full_charge_calculated_c_.load(&stored_capacity)) {
                 if (stored_capacity != capacity) {
                   ESP_LOGD(TAG, "Saving full charge: %i", capacity);
-                  pref_full_charge_calculated_c_.save(&capacity);
+                  flash_full_charge_calculated_c_.save(&capacity);
                 }
               } else {
-                pref_full_charge_calculated_c_.save(&capacity);
+                flash_full_charge_calculated_c_.save(&capacity);
               }
               ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
             } else {
@@ -266,9 +285,9 @@ namespace esphome {
             }
           }
           // calculate energy based on energy
-          if (cumulative_at_fill_charge_j_.has_value() && cumulative_at_full_discharge_j_.has_value()) {
-            const auto energy_delta = cumulative_energy_in_j_ - cumulative_at_fill_charge_j_.value();
-            const auto discharge_delta = cumulative_energy_out_j_ - cumulative_at_full_discharge_j_.value();
+          if (cumulative_at_full_in_j_.has_value() && cumulative_at_full_out_j_.has_value()) {
+            const auto energy_delta = cumulative_energy_in_j_ - cumulative_at_full_in_j_.value();
+            const auto discharge_delta = cumulative_energy_out_j_ - cumulative_at_full_out_j_.value();
             const auto energy_capacity = energy_delta + discharge_delta;
 
             ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
@@ -277,13 +296,13 @@ namespace esphome {
             if (energy_capacity > 0) {
               full_energy_calculated_j_ = energy_capacity;
               int32_t stored_energy;
-              if (pref_full_energy_calculated_j_.load(&stored_energy)) {
+              if (flash_full_energy_calculated_j_.load(&stored_energy)) {
                 if (stored_energy != energy_capacity) {
                   ESP_LOGD(TAG, "Saving full energy: %i", energy_capacity);
-                  pref_full_energy_calculated_j_.save(&energy_capacity);
+                  flash_full_energy_calculated_j_.save(&energy_capacity);
                 }
               } else {
-                pref_full_energy_calculated_j_.save(&energy_capacity);
+                flash_full_energy_calculated_j_.save(&energy_capacity);
               }
               ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
             } else {
@@ -455,5 +474,29 @@ namespace esphome {
         sensor->publish_state(value);
       }
     }
+
+    void CoulombMeter::dump_config() {
+
+      ESP_LOGCONFIG(TAG, "Coulomb Meter Config: ...");
+    }
+    float CoulombMeter::get_setup_priority() const { return setup_priority::DATA; }
+
+    float CoulombMeter::get_voltage() { 
+      ESP_LOGE(TAG, "get_voltage() not implemented");
+      return 0.0f; 
+    };
+    float CoulombMeter::get_current() {
+      ESP_LOGE(TAG, "get_current() not implemented");
+      return 0.0f; 
+    };
+    int64_t CoulombMeter::get_charge_c() {
+      ESP_LOGE(TAG, "get_charge_c() not implemented");
+      return 0;
+    };
+    int64_t CoulombMeter::get_energy_j() {
+      ESP_LOGE(TAG, "get_energy_j() not implemented");
+      return 0;
+    };
+
   } // namespace coulomb_meter
 } // namespace esphome
