@@ -129,11 +129,9 @@ class CoulombMeter : public PollingComponent {
  protected:
     bool updateSensors();
     void updateState();
+    void storeCounters();
 
     void publish_state_(sensor::Sensor *sensor, float value);
-
-    // int16_t current_charge_level_{0};
-    // int16_t current_energy_level_{0};
 
     float fully_charge_voltage_{0};
     optional<float> fully_charge_current_;
@@ -167,10 +165,6 @@ class CoulombMeter : public PollingComponent {
     ESPPreferenceObject rtc_cumulative_charge_out_c_{nullptr};
     ESPPreferenceObject rtc_cumulative_energy_out_j_{nullptr};
 
-    optional<uint64_t> cumulative_at_full_in_c_;
-    optional<uint64_t> cumulative_at_full_in_j_;
-    optional<uint64_t> cumulative_at_full_out_c_;
-    optional<uint64_t> cumulative_at_full_out_j_;
     ESPPreferenceObject rtc_cumulative_at_full_in_c_{nullptr};
     ESPPreferenceObject rtc_cumulative_at_full_in_j_{nullptr};
     ESPPreferenceObject rtc_cumulative_at_full_out_c_{nullptr};
@@ -210,8 +204,6 @@ class CoulombMeter : public PollingComponent {
       ENERGY_CALCULATED_SENSOR,
       TIME_REMAINING_SENSOR,
     } meter_state_{State::NOT_INITIALIZED};
-
-    void storeCounters();
 };
 
 }  // namespace coulomb_meter
