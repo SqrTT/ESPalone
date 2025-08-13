@@ -113,7 +113,7 @@ float INA226Component::get_setup_priority() const { return setup_priority::DATA;
 void INA226Component::update() {
   if (this->is_ready()) {    
     if (this->previous_time_ == 0) {
-      this->previous_time_ = millis();
+      this->previous_time_ = App.get_loop_component_start_time();
     }
     this->state_ = State::DATA_COLLECTION_START;
     this->CoulombMeter::update();
@@ -137,7 +137,7 @@ void INA226Component::loop() {
     if (reads_count_ > 20) {
       reads_count_ = 0;
     };
-    const auto now = millis();
+    const auto now = App.get_loop_component_start_time();
     const auto current = this->read_current_ma_();
     this->latest_current_ = current / 1000.0f;
     const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
@@ -211,7 +211,7 @@ void INA226Component::loop() {
       }
       #ifdef ESPHOME_LOG_HAS_VERBOSE
       {
-        auto now = millis();
+        auto now = App.get_loop_component_start_time();
         ESP_LOGV(TAG, "Charge reads per second: %f", this->charge_reads_count_ * 1000.0f / (now - this->charge_reads_time_));
         this->charge_reads_count_ = 0;
         this->charge_reads_time_ = now;

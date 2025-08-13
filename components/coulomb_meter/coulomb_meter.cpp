@@ -1,6 +1,6 @@
 #include "coulomb_meter.h"
 
-// .platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-addr2line -pfiaC -e esphome_config/.esphome/build/ina226coulomb/.pioenvs/ina226coulomb/firmware.elf  0x4022b8e2
+// .platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-addr2line -pfiaC -e esphome_config/.esphome/build/ina226coulomb/.pioenvs/ina226coulomb/firmware.elf  0x4023bf0b
 namespace esphome {
   namespace coulomb_meter {
 
@@ -252,13 +252,15 @@ namespace esphome {
             if (capacity > 0) {
               full_charge_calculated_c_ = capacity;
               int32_t stored_capacity = 0;
-              if (flash_full_charge_calculated_c_.load(&stored_capacity)) {
+              if (full_charge_calculated_c_.has_value() && flash_full_charge_calculated_c_.load(&stored_capacity)) {
                 if (stored_capacity != full_charge_calculated_c_) {
                   ESP_LOGD(TAG, "Saving full charge: %i", full_charge_calculated_c_);
-                  flash_full_charge_calculated_c_.save(&full_charge_calculated_c_);
+                  const auto value_to_save = full_charge_calculated_c_.value();
+                  flash_full_charge_calculated_c_.save(&value_to_save);
                 }
-              } else {
-                flash_full_charge_calculated_c_.save(&full_charge_calculated_c_);
+              } else if (full_charge_calculated_c_.has_value()) {
+                const auto value_to_save = full_charge_calculated_c_.value();
+                flash_full_charge_calculated_c_.save(&value_to_save);
               }
               ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
             } else {
@@ -283,13 +285,15 @@ namespace esphome {
             if (energy_capacity > 0) {
               full_energy_calculated_j_ = energy_capacity;
               int32_t stored_energy = 0;
-              if (flash_full_energy_calculated_j_.load(&stored_energy)) {
+              if (full_energy_calculated_j_.has_value() && flash_full_energy_calculated_j_.load(&stored_energy)) {
                 if (stored_energy != full_energy_calculated_j_) {
                   ESP_LOGD(TAG, "Saving full energy: %i", full_energy_calculated_j_);
-                  flash_full_energy_calculated_j_.save(&full_energy_calculated_j_);
+                  const auto value_to_save = full_energy_calculated_j_.value();
+                  flash_full_energy_calculated_j_.save(&value_to_save);
                 }
-              } else {
-                flash_full_energy_calculated_j_.save(&full_energy_calculated_j_);
+              } else if (full_energy_calculated_j_.has_value()) {
+                const auto value_to_save = full_energy_calculated_j_.value();
+                flash_full_energy_calculated_j_.save(&value_to_save);
               }
               ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
             } else {
