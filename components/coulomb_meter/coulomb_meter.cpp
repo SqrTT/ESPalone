@@ -6,6 +6,7 @@ namespace esphome {
 
     static const char *const TAG = "CoulombMeter";
     static const unsigned int TIME_REMAINING = 30000; // ms
+    static const auto SENSORS_COUNT = 13;
 
     int32_t clamp_map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, int32_t out_max)
     {
@@ -24,9 +25,6 @@ namespace esphome {
     }
 
     void CoulombMeter::setup() {
-      this->set_interval("updateStatus", 1000, [this]() { 
-        this->updateState(); 
-      });
       if (charge_time_remaining_sensor_ != nullptr || discharge_time_remaining_sensor_ != nullptr) {
         this->energy_usage_average_.setup(10);
         this->set_interval("updateTimeRemaining", TIME_REMAINING, [this]() { 
@@ -100,9 +98,9 @@ namespace esphome {
         current_energy_j_ = energy;
       }
 
-      this->set_interval("saveCounters", 15 * 1000, [this]() { 
-        this->storeCounters(); 
-      });
+      this->set_interval("updateStatus", 1000, [this]() { updateState(); });
+
+      this->set_interval("reportSensors", this->get_update_interval() / SENSORS_COUNT, [this] { reportSensors(); });
     }
 
     void CoulombMeter::storeCounters() {
@@ -119,50 +117,11 @@ namespace esphome {
       storeCounters();
     }
 
-    void CoulombMeter::update() {
-      if (this->meter_state_ == State::IDLE) {
-        this->meter_state_ = State::START;
-      }
-    }
-
     void CoulombMeter::updateState() {
-      if (this->meter_state_ == State::NOT_INITIALIZED) {
-        return;
-      }
       const auto voltage = this->get_voltage();
-
-      if (this->meter_state_ == State::SETUP) {
-
-        if (current_charge_c_ == 0) {
-          ESP_LOGD(TAG, "Failed to load current charge, use voltage to determinate charge level");
-          // use initial charge based on voltage
-          current_charge_c_ = clamp_map(
-            voltage * 1000,
-            fully_discharge_voltage_v_ * 1000,
-            fully_charge_voltage_ * 1000,
-            0,
-            full_charge_calculated_c_.value_or(full_capacity_c_)
-          );
-        }
-
-        if (current_energy_j_ == 0) {
-          ESP_LOGD(TAG, "Failed to load current energy, use voltage to determinate charge level");
-          current_energy_j_ = clamp_map(
-            voltage * 1000,
-            fully_discharge_voltage_v_ * 1000,
-            fully_charge_voltage_ * 1000,
-            0,
-            full_energy_calculated_j_.value_or(full_energy_j_)
-          );
-        }
- 
-        prev_time_energy_j_ = current_energy_j_;
-        this->meter_state_ = State::IDLE;
-      }
-
       const auto charge = this->get_charge_c();
 
-      int32_t delta_charge = charge - this->previous_charge_c_;
+      const auto delta_charge = charge - this->previous_charge_c_;
       this->previous_charge_c_ = charge;
 
       if (delta_charge > 0) {
@@ -253,8 +212,8 @@ namespace esphome {
               full_charge_calculated_c_ = capacity;
               int32_t stored_capacity = 0;
               if (full_charge_calculated_c_.has_value() && flash_full_charge_calculated_c_.load(&stored_capacity)) {
-                if (stored_capacity != full_charge_calculated_c_) {
-                  ESP_LOGD(TAG, "Saving full charge: %i", full_charge_calculated_c_);
+                if (stored_capacity != full_charge_calculated_c_.value()) {
+                  ESP_LOGD(TAG, "Saving full charge: %i", full_charge_calculated_c_.value());
                   const auto value_to_save = full_charge_calculated_c_.value();
                   flash_full_charge_calculated_c_.save(&value_to_save);
                 }
@@ -267,6 +226,8 @@ namespace esphome {
               ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
             }
           }
+
+
           // calculate energy based on energy
           uint64_t cumulative_at_full_in_j_ = 0;
           uint64_t cumulative_at_full_out_j_ = 0;
@@ -307,19 +268,10 @@ namespace esphome {
       }
     }
 
-    bool CoulombMeter::updateSensors() {
-      switch (this->meter_state_) {
-        case State::NOT_INITIALIZED:
-          this->meter_state_ = State::SETUP;
-          return true;
-          break;
-        case State::SETUP:
-        case State::IDLE:
-          return true;
-          break;
-        case State::START:
-        case State::CHARGE_LEVEL_SENSOR:
-          this->meter_state_ = State::CHARGE_OUT_SENSOR;
+    void CoulombMeter::reportSensors() {
+      
+      switch (report_count_ % SENSORS_COUNT) {
+        case 0:
           if (charge_level_sensor_ != nullptr) {
             const auto current_charge_level_ = std::min(
                 std::max(
@@ -335,43 +287,30 @@ namespace esphome {
                 full_charge_reached_ ? 100 : 99
             );
             
-
             publish_state_(charge_level_sensor_, current_charge_level_);
-          } 
-          return false;
-          break;
-        case State::CHARGE_OUT_SENSOR:
-          this->meter_state_ = State::CHARGE_IN_SENSOR;
-
-          publish_state_(charge_out_sensor_, this->cumulative_charge_out_c_ / 3600.0f);
-
-          return false;
-          break;
-        case State::CHARGE_IN_SENSOR:
-          this->meter_state_ = State::CHARGE_REMAINING_SENSOR;
-          publish_state_(charge_in_sensor_, this->cumulative_charge_in_c_ / 3600.0f);
-
-          return false;
-        case State::CHARGE_REMAINING_SENSOR:
-          this->meter_state_ = State::CHARGE_CALCULATED_SENSOR;
-
-          publish_state_(charge_remaining_sensor_, this->current_charge_c_ / 3600.0f);
-          return false;
-        case State::CHARGE_CALCULATED_SENSOR:
-          this->meter_state_ = State::ENERGY_LEVEL_SENSOR;
-          if (this->full_charge_calculated_c_.has_value()) {
-            ESP_LOGD(TAG, "Charge calculated sensor: %i", this->full_charge_calculated_c_.value());
-          } else {
-            ESP_LOGD(TAG, "Charge calculated sensor: HAS NO VALUE");
           }
-          if (full_charge_calculated_c_.has_value()) {
-            publish_state_(this->charge_calculated_sensor_, full_charge_calculated_c_.value() / 3600.0f);
+          break;
+        case 1:
+          if (charge_out_sensor_ != nullptr) {
+            publish_state_(charge_out_sensor_, this->cumulative_charge_out_c_ / 3600.0f);
           }
-          
-          return false;
-        case State::ENERGY_LEVEL_SENSOR:
-          this->meter_state_ = State::ENERGY_OUT_SENSOR;
-
+          break;
+        case 2:
+          if (charge_in_sensor_ != nullptr) {
+            publish_state_(charge_in_sensor_, this->cumulative_charge_in_c_ / 3600.0f);
+          }
+          break;
+        case 3:
+          if (charge_remaining_sensor_ != nullptr) {
+            publish_state_(charge_remaining_sensor_, this->current_charge_c_ / 3600.0f);
+          }
+          break;
+        case 4:
+          if (charge_calculated_sensor_ != nullptr && full_charge_calculated_c_.has_value()) {
+            publish_state_(charge_calculated_sensor_, full_charge_calculated_c_.value() / 3600.0f);
+          }
+          break;
+        case 5:
           if (energy_level_sensor_ != nullptr) {
             const auto current_energy_level_ = std::min(
                 std::max(
@@ -387,77 +326,69 @@ namespace esphome {
                 full_charge_reached_ ? 100 : 99
             );
             publish_state_(energy_level_sensor_, current_energy_level_);
-          } 
-          return false;
-        case State::ENERGY_OUT_SENSOR:
-          this->meter_state_ = State::ENERGY_IN_SENSOR;
-          //ESP_LOGD(TAG, "Energy out sensor: %i", this->cumulative_energy_out_j_);
-
-          publish_state_(energy_out_sensor_, this->cumulative_energy_out_j_ / 3600.0f);
-
-          return false;
-        case State::ENERGY_IN_SENSOR:
-          this->meter_state_ = State::ENERGY_REMAINING_SENSOR;
-          //ESP_LOGD(TAG, "Energy in sensor: %i", this->cumulative_energy_in_j_);
-          publish_state_(energy_in_sensor_, this->cumulative_energy_in_j_ / 3600.0f);
-
-          return false;
-        case State::ENERGY_REMAINING_SENSOR:
-          this->meter_state_ = State::ENERGY_CALCULATED_SENSOR;
-          publish_state_(energy_remaining_sensor_, this->current_energy_j_ / 3600.0f);
-          return false;
-        case State::ENERGY_CALCULATED_SENSOR:
-          this->meter_state_ = State::TIME_REMAINING_SENSOR;
-           
-
-          // if (this->full_energy_calculated_j_.has_value()) {
-          //   ESP_LOGD(TAG, "Energy calculated sensor: %i", this->full_energy_calculated_j_.value());
-          // } else {
-          //   ESP_LOGD(TAG, "Energy calculated sensor: HAS NO VALUE");
-          // }
-          if (full_energy_calculated_j_.has_value()) {
-            publish_state_(this->energy_calculated_sensor_, full_energy_calculated_j_.value() / 3600.0f);
           }
+          break;
+        case 6:
+          if (energy_calculated_sensor_ != nullptr && full_energy_calculated_j_.has_value()) {
+            publish_state_(energy_calculated_sensor_, full_energy_calculated_j_.value() / 3600.0f);
+          }
+          break;
+        case 7:
+          if (energy_remaining_sensor_ != nullptr) {
+            publish_state_(energy_remaining_sensor_, this->current_energy_j_ / 3600.0f);
+          }
+          break;
+        case 8:
+          if (energy_out_sensor_ != nullptr) {
+            publish_state_(energy_out_sensor_, this->cumulative_energy_out_j_ / 3600.0f);
+          }
+          break;
+        case 9:
+          if (energy_in_sensor_ != nullptr) {
+            publish_state_(energy_in_sensor_, this->cumulative_energy_in_j_ / 3600.0f);
+          }
+          break;
+        case 10:
+          if (energy_calculated_sensor_ != nullptr && full_energy_calculated_j_.has_value()) {
+            publish_state_(energy_calculated_sensor_, full_energy_calculated_j_.value() / 3600.0f);
+          }
+          break;
+        case 11:
+         if (charge_time_remaining_sensor_ != nullptr || discharge_time_remaining_sensor_ != nullptr) {
+          const auto avg_energy = this->energy_usage_average_.get();
+          const auto avg_energy_usage_minutes = avg_energy * (60000.0f / TIME_REMAINING);
 
-          return false;
-        case State::TIME_REMAINING_SENSOR:
-          this->meter_state_ = State::IDLE;
+          if (std::abs(avg_energy_usage_minutes) < 0.1) {
+            publish_state_(charge_time_remaining_sensor_, NAN);
+            publish_state_(discharge_time_remaining_sensor_, NAN);
 
-          if (charge_time_remaining_sensor_ != nullptr || discharge_time_remaining_sensor_ != nullptr) {
-            const auto avg_energy = this->energy_usage_average_.get();
-            const auto avg_energy_usage_minutes = avg_energy * (60000.0f / TIME_REMAINING);
+          } else if (avg_energy_usage_minutes > 0) {
+            auto const energy_to_full = full_energy_calculated_j_.value_or(full_energy_j_) - this->current_energy_j_;
+            const auto time_remaining = energy_to_full / avg_energy_usage_minutes;
+            
+            publish_state_(charge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
 
-            if (std::abs(avg_energy_usage_minutes) < 0.1) {
-              publish_state_(charge_time_remaining_sensor_, NAN);
-              publish_state_(discharge_time_remaining_sensor_, NAN);
-
-            } else if (avg_energy_usage_minutes > 0) {
-              auto const energy_to_full = full_energy_calculated_j_.value_or(full_energy_j_) - this->current_energy_j_;
-              const auto time_remaining = energy_to_full / avg_energy_usage_minutes;
-              
-              publish_state_(charge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
-
-              if (discharge_time_remaining_sensor_ != nullptr) {
-                if (!std::isnan(discharge_time_remaining_sensor_->state)) {
-                  publish_state_(discharge_time_remaining_sensor_, NAN);
-                }
+            if (discharge_time_remaining_sensor_ != nullptr) {
+              if (!std::isnan(discharge_time_remaining_sensor_->state)) {
+                publish_state_(discharge_time_remaining_sensor_, NAN);
               }
-            } else {
-              const auto time_remaining = this->current_energy_j_ / -avg_energy_usage_minutes;
-    
-              if (charge_time_remaining_sensor_ != nullptr && !std::isnan(charge_time_remaining_sensor_->state)) {
-                publish_state_(charge_time_remaining_sensor_, NAN);
-              }
-              publish_state_(discharge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
             }
+          } else {
+            const auto time_remaining = this->current_energy_j_ / -avg_energy_usage_minutes;
 
+            if (charge_time_remaining_sensor_ != nullptr && !std::isnan(charge_time_remaining_sensor_->state)) {
+              publish_state_(charge_time_remaining_sensor_, NAN);
+            }
+            publish_state_(discharge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
           }
-          return false;
+        }
+        case 12:
+          this->storeCounters();
+          break;
         default:
           break;
-        }
-
-        return true;
+      }
+      report_count_++;
     }
 
     void CoulombMeter::publish_state_(sensor::Sensor *sensor, float value) {

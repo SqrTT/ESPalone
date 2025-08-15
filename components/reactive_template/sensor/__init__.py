@@ -41,29 +41,18 @@ async def to_code(config):
         )
         cg.add(var.set_template(template_))
 
+    dependsOnName = f"{config['id'].id}_DependsOn"
+    dependsOnSensors = []
+
     if CONF_SENSORS in config:
         dependsOnSensors = config[CONF_SENSORS]
-        dependsOnName = f"{config['id'].id}_DependsOn"
-
-        expr = cg.RawExpression(f"static sensor::Sensor * const {dependsOnName}[] = " + "{" + ",".join(map(toIDs,dependsOnSensors)) + "}")
-
-        for sen in dependsOnSensors:
-            await cg.get_variable(sen)
-
-        cg.add(expr)
-        cg.add(var.set_depends_on_sensors(cg.RawExpression(f"{dependsOnName}"), len(dependsOnSensors)));
-    
     elif CONF_LAMBDA in config:
         dependsOnSensors = config[CONF_LAMBDA].requires_ids
-        dependsOnName = f"{config['id'].id}_DependsOn"
 
-        expr = cg.RawExpression(f"static sensor::Sensor * const {dependsOnName}[] = " + "{" + ",".join(map(toIDs,dependsOnSensors)) + "}")
+    expr = cg.RawExpression(f"static sensor::Sensor * const {dependsOnName}[{len(dependsOnSensors)}] = " + "{ " + ",".join(map(toIDs,dependsOnSensors)) + " }")
 
-        for sen in dependsOnSensors:
-            await cg.get_variable(sen)
-
-        cg.add(expr)
-        cg.add(var.set_depends_on_sensors(cg.RawExpression(f"{dependsOnName}"), len(dependsOnSensors)));
+    cg.add(expr)
+    cg.add(var.set_depends_on_sensors(cg.RawExpression(f"{dependsOnName}"), len(dependsOnSensors)));
 
 
 @automation.register_action(

@@ -90,7 +90,6 @@ class CoulombMeter : public PollingComponent {
  public:
   // CoulombMeter() : PollingComponent(0), energy_usage_average_(6) {};
   void setup() override;
-  void update() override;
   void dump_config() override;
   float get_setup_priority() const override;
   // void loop() override;
@@ -127,7 +126,7 @@ class CoulombMeter : public PollingComponent {
   virtual int64_t get_energy_j();
 
  protected:
-    bool updateSensors();
+    void reportSensors();
     void updateState();
     void storeCounters();
 
@@ -187,23 +186,7 @@ class CoulombMeter : public PollingComponent {
     MovingAvarage energy_usage_average_;
     int32_t prev_time_energy_j_{0};
 
-    enum class State : uint8_t {
-      NOT_INITIALIZED = 0x0,
-      IDLE,
-      SETUP,
-      START,
-      CHARGE_LEVEL_SENSOR,
-      CHARGE_OUT_SENSOR,
-      CHARGE_IN_SENSOR,
-      CHARGE_REMAINING_SENSOR,
-      CHARGE_CALCULATED_SENSOR,
-      ENERGY_LEVEL_SENSOR,
-      ENERGY_IN_SENSOR,
-      ENERGY_OUT_SENSOR,
-      ENERGY_REMAINING_SENSOR,
-      ENERGY_CALCULATED_SENSOR,
-      TIME_REMAINING_SENSOR,
-    } meter_state_{State::NOT_INITIALIZED};
+    uint8_t report_count_{0};
 };
 
 }  // namespace coulomb_meter

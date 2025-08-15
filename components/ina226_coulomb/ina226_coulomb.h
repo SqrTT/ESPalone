@@ -48,9 +48,10 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
  public:
   void setup() override;
   void dump_config() override;
-  float get_setup_priority() const override;
   void update() override;
-  void loop() override;
+  float get_setup_priority() const override;
+  void report_coulomb();
+  void calc_charge();
 
   void set_shunt_resistance_ohm(float shunt_resistance_ohm) { shunt_resistance_ohm_ = shunt_resistance_ohm; }
   void set_max_current_a(float max_current_a) { max_current_a_ = max_current_a; }
@@ -104,21 +105,8 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   uint32_t charge_reads_count_{0};
   uint32_t charge_reads_time_{0};
   #endif
-
+  uint8_t reportCount_{0};
   float read_current_ma_();
-
-  enum class State : uint8_t {
-    NOT_INITIALIZED = 0x0,
-    IDLE,
-    DATA_COLLECTION_START,
-    DATA_COLLECTION_VOLTAGE,
-    DATA_COLLECTION_SHUNT_VOLTAGE,
-    DATA_COLLECTION_CURRENT,
-    DATA_COLLECTION_POWER,
-    DATA_REPORT_COULUMB,
-    DATA_REPORT_PARENT_UPDATE,
-    DATA_CALCULATE_CHARGE
-  } state_{State::NOT_INITIALIZED};
 };
 
 }  // namespace ina226_coulomb
