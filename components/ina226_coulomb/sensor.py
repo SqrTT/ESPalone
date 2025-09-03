@@ -10,11 +10,13 @@ from esphome.const import (
     CONF_POWER,
     CONF_SHUNT_RESISTANCE,
     CONF_SHUNT_VOLTAGE,
+    ENTITY_CATEGORY_DIAGNOSTIC,
     DEVICE_CLASS_VOLTAGE,
     DEVICE_CLASS_CURRENT,
     DEVICE_CLASS_POWER,
     STATE_CLASS_MEASUREMENT,
     UNIT_VOLT,
+    UNIT_HERTZ,
     UNIT_AMPERE,
     UNIT_WATT,
     CONF_VOLTAGE,
@@ -29,6 +31,7 @@ CONF_ADC_TIME = "adc_time"
 CONF_CHARGE_COULOMBS = "charge_coulombs"
 CONF_HIGH_FREQUENCY_LOOP = "high_frequency_loop"
 CONF_BUS_VOLTAGE_CALIBRATION = "bus_voltage_calibration"
+CONF_READS_PER_SECOND = "reads_per_second"
 UNIT_COULOMB = "C"
 
 ina226_ns = cg.esphome_ns.namespace("ina226_coulomb")
@@ -76,6 +79,12 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_VOLTAGE,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
+            cv.Optional(CONF_READS_PER_SECOND): sensor.sensor_schema(
+                unit_of_measurement=UNIT_HERTZ,
+                accuracy_decimals=1,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC
+            ),
+
             cv.Optional(CONF_SHUNT_VOLTAGE): sensor.sensor_schema(
                 unit_of_measurement=UNIT_VOLT,
                 accuracy_decimals=3,
@@ -105,7 +114,7 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_MAX_CURRENT, default=3.2): cv.All(
                 cv.current, cv.Range(min=0.0)
-            ),
+            ), 
             cv.Optional(CONF_BUS_VOLTAGE_CALIBRATION, default=1): cv.All(
                 cv.positive_float, cv.Range(min=0.0)
             ),
@@ -167,7 +176,11 @@ async def to_code(config):
     if conf := config.get(CONF_CHARGE_COULOMBS):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_charge_coulombs_sensor(sens))
-    
+
+    if conf := config.get(CONF_READS_PER_SECOND):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_read_per_second_sensor(sens))
+
     if CONF_HIGH_FREQUENCY_LOOP in config and config[CONF_HIGH_FREQUENCY_LOOP]:
         cg.add(var.set_high_frequency_loop())
 

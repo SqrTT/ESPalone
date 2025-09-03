@@ -18,7 +18,9 @@ namespace esphome {
 
       // Prevent division by zero
       if (in_max == in_min) {
-          ESP_LOGE(TAG, "clamp_map: Division by zero detected (in_max == in_min)");
+          #ifdef ESPHOME_LOG_HAS_ERROR
+            ESP_LOGE(TAG, "clamp_map: Division by zero detected (in_max == in_min)");
+          #endif
           return out_min; // Return a safe default value
       }
       return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
@@ -73,28 +75,40 @@ namespace esphome {
 
       int32_t charge_calculated_c_ = 0;
       if (flash_full_charge_calculated_c_.load(&charge_calculated_c_)) {
-        ESP_LOGD(TAG, "Loaded full charge from flash: %i", charge_calculated_c_);
+        #ifdef ESPHOME_LOG_HAS_DEBUG
+          ESP_LOGD(TAG, "Loaded full charge from flash: %i", charge_calculated_c_);
+        #endif
         full_charge_calculated_c_ = charge_calculated_c_;
       } else {
-        ESP_LOGD(TAG, "Failed to load full charge, use default");
+        #ifdef ESPHOME_LOG_HAS_DEBUG
+          ESP_LOGD(TAG, "Failed to load full charge, use default");
+        #endif  
       };
       int32_t energy_calculated_j_;
       if (flash_full_energy_calculated_j_.load(&energy_calculated_j_)) {
-        ESP_LOGD(TAG, "Loaded full energy from flash: %i", energy_calculated_j_);
+        #ifdef ESPHOME_LOG_HAS_DEBUG
+          ESP_LOGD(TAG, "Loaded full energy from flash: %i", energy_calculated_j_);
+        #endif
         full_energy_calculated_j_ = energy_calculated_j_;
       } else {
-        ESP_LOGD(TAG, "Failed to load full energy, use default");
+        #ifdef ESPHOME_LOG_HAS_DEBUG
+          ESP_LOGD(TAG, "Failed to load full energy, use default");
+        #endif
       };
 
       int32_t charge;
       if (rtc_current_charge_c_.load(&charge)) {
-        ESP_LOGD(TAG, "Loaded current charge from rtc: %i", charge);
+        #ifdef ESPHOME_LOG_HAS_DEBUG
+          ESP_LOGD(TAG, "Loaded current charge from rtc: %i", charge);
+        #endif
         current_charge_c_ = charge;
       }
 
       int32_t energy;
       if (rtc_current_energy_j_.load(&energy)) {
-        ESP_LOGD(TAG, "Loaded current energy from rtc: %i", energy);
+        #ifdef ESPHOME_LOG_HAS_DEBUG
+          ESP_LOGD(TAG, "Loaded current energy from rtc: %i", energy);
+        #endif
         current_energy_j_ = energy;
       }
 
@@ -176,8 +190,9 @@ namespace esphome {
           full_charge_reached_ = true;
           this->current_charge_c_ = full_charge_calculated_c_.value_or(full_capacity_c_);
           this->current_energy_j_ = full_energy_calculated_j_.value_or(full_energy_j_);
-          ESP_LOGD(TAG, "Full charge reached: %i", this->current_charge_c_);
-
+          #ifdef ESPHOME_LOG_HAS_DEBUG
+            ESP_LOGD(TAG, "Full charge reached: %i", this->current_charge_c_);
+          #endif
           rtc_cumulative_at_full_in_c_.save(&cumulative_charge_in_c_);
           rtc_cumulative_at_full_in_j_.save(&cumulative_energy_in_j_);
           rtc_cumulative_at_full_out_c_.save(&cumulative_charge_out_c_);
@@ -204,16 +219,19 @@ namespace esphome {
             const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_full_in_c_;
             const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_out_c_;
             const auto capacity = charge_delta + discharge_delta;
+            #ifdef ESPHOME_LOG_HAS_DEBUG
+              ESP_LOGD(TAG, "Capacity calculated: %i, charge_delta: %i, discharge_delta: %i", capacity, charge_delta, discharge_delta);
+            #endif
 
-            ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
-            ESP_LOGD(TAG, "Charge delta: %i", charge_delta);
-            ESP_LOGD(TAG, "Discharge delta: %i", discharge_delta);
             if (capacity > 0) {
               full_charge_calculated_c_ = capacity;
               int32_t stored_capacity = 0;
               if (full_charge_calculated_c_.has_value() && flash_full_charge_calculated_c_.load(&stored_capacity)) {
                 if (stored_capacity != full_charge_calculated_c_.value()) {
-                  ESP_LOGD(TAG, "Saving full charge: %i", full_charge_calculated_c_.value());
+                  #ifdef ESPHOME_LOG_HAS_DEBUG
+                    ESP_LOGD(TAG, "Full charge calculated: %i", full_charge_calculated_c_.value());
+                  #endif
+                  
                   const auto value_to_save = full_charge_calculated_c_.value();
                   flash_full_charge_calculated_c_.save(&value_to_save);
                 }
@@ -221,9 +239,13 @@ namespace esphome {
                 const auto value_to_save = full_charge_calculated_c_.value();
                 flash_full_charge_calculated_c_.save(&value_to_save);
               }
-              ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
+              #ifdef ESPHOME_LOG_HAS_DEBUG
+                ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
+              #endif
             } else {
-              ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
+              #ifdef ESPHOME_LOG_HAS_WARN
+                ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
+              #endif
             }
           }
 
@@ -240,15 +262,17 @@ namespace esphome {
             const auto discharge_delta = cumulative_energy_out_j_ - cumulative_at_full_out_j_;
             const auto energy_capacity = energy_delta + discharge_delta;
 
-            ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
-            ESP_LOGD(TAG, "Energy delta: %i", energy_delta);
-            ESP_LOGD(TAG, "Discharge delta: %i", discharge_delta);
+            #ifdef ESPHOME_LOG_HAS_DEBUG
+              ESP_LOGD(TAG, "Energy capacity calculated: %i, energy_delta: %i, discharge_delta: %i", energy_capacity, energy_delta, discharge_delta);
+            #endif
             if (energy_capacity > 0) {
               full_energy_calculated_j_ = energy_capacity;
               int32_t stored_energy = 0;
               if (full_energy_calculated_j_.has_value() && flash_full_energy_calculated_j_.load(&stored_energy)) {
                 if (stored_energy != full_energy_calculated_j_) {
-                  ESP_LOGD(TAG, "Saving full energy: %i", full_energy_calculated_j_);
+                  #ifdef ESPHOME_LOG_HAS_DEBUG
+                    ESP_LOGD(TAG, "Saving full energy: %i", full_energy_calculated_j_);
+                  #endif
                   const auto value_to_save = full_energy_calculated_j_.value();
                   flash_full_energy_calculated_j_.save(&value_to_save);
                 }
@@ -256,9 +280,13 @@ namespace esphome {
                 const auto value_to_save = full_energy_calculated_j_.value();
                 flash_full_energy_calculated_j_.save(&value_to_save);
               }
-              ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
+              #ifdef ESPHOME_LOG_HAS_DEBUG
+                ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
+              #endif
             } else {
-              ESP_LOGW(TAG, "Energy capacity invalid: %i", energy_capacity);
+              #ifdef ESPHOME_LOG_HAS_WARN
+                ESP_LOGW(TAG, "Energy capacity invalid: %i", energy_capacity);
+              #endif
             }
           }
         });
@@ -404,19 +432,27 @@ namespace esphome {
     float CoulombMeter::get_setup_priority() const { return setup_priority::DATA; }
 
     float CoulombMeter::get_voltage() { 
-      ESP_LOGE(TAG, "get_voltage() not implemented");
+      #ifdef ESPHOME_LOG_HAS_ERROR
+        ESP_LOGE(TAG, "get_voltage() not implemented");
+      #endif
       return 0.0f; 
     };
     float CoulombMeter::get_current() {
+      #ifdef ESPHOME_LOG_HAS_ERROR
       ESP_LOGE(TAG, "get_current() not implemented");
+      #endif
       return 0.0f; 
     };
     int64_t CoulombMeter::get_charge_c() {
-      ESP_LOGE(TAG, "get_charge_c() not implemented");
+      #ifdef ESPHOME_LOG_HAS_ERROR
+        ESP_LOGE(TAG, "get_charge_c() not implemented");
+      #endif
       return 0;
     };
     int64_t CoulombMeter::get_energy_j() {
-      ESP_LOGE(TAG, "get_energy_j() not implemented");
+      #ifdef ESPHOME_LOG_HAS_ERROR
+        ESP_LOGE(TAG, "get_energy_j() not implemented");
+      #endif
       return 0;
     };
 

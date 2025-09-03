@@ -37,7 +37,7 @@ static const uint8_t INA226_REGISTER_CALIBRATION = 0x05;
 static const uint16_t INA226_ADC_TIMES[] = {140, 204, 332, 588, 1100, 2116, 4156, 8244};
 static const uint16_t INA226_ADC_AVG_SAMPLES[] = {1, 4, 16, 64, 128, 256, 512, 1024};
 
-static const uint8_t SENSORS_COUNT = 6;
+static const uint8_t SENSORS_COUNT = 7;
 
 void INA226Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up INA226...");
@@ -78,7 +78,9 @@ void INA226Component::setup() {
 
   const auto calibration = uint32_t(0.00512 / (lsb * this->shunt_resistance_ohm_ / 1000000.0f));
 
+  #ifdef ESPHOME_LOG_HAS_VERBOSE
   ESP_LOGV(TAG, "    Using LSB=%" PRIu32 " calibration=%" PRIu32, lsb, calibration);
+  #endif
 
   if (!this->write_byte_16(INA226_REGISTER_CALIBRATION, calibration)) {
     this->mark_failed();
@@ -89,7 +91,7 @@ void INA226Component::setup() {
 
   this->disable_loop();
 
-  this->set_interval("calcCharge", 1, [this]() {
+  this->set_interval("calcCharge", 0, [this]() {
     this->calc_charge();
   });
 
@@ -100,6 +102,7 @@ void INA226Component::setup() {
   });
 
   this->previous_time_ = App.get_loop_component_start_time();
+  this->charge_read_time_ = App.get_loop_component_start_time();
   // high_frequency_loop_requester_.start();
 }
 
@@ -166,16 +169,21 @@ void INA226Component::report_coulomb() {
     if (this->charge_coulombs_sensor_ != nullptr) {
       this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
     }
-
-    #ifdef ESPHOME_LOG_HAS_VERBOSE
-    {
-      auto now = App.get_loop_component_start_time();
-      ESP_LOGV(TAG, "Charge reads per second: %f", this->charge_reads_count_ * 1000.0f / (now - this->charge_reads_time_));
-      this->charge_reads_count_ = 0;
-      this->charge_reads_time_ = now;
-    }
-    #endif
    break;
+  case 6:
+    if (this->read_per_second_sensor_ != nullptr) {
+      auto const now = App.get_loop_component_start_time();
+      auto const elapsed_s = (now - this->charge_read_time_) / 1000.0f;
+      if (elapsed_s != 0) {
+        const auto reads_per_second = static_cast<float>(this->charge_reads_count_) / elapsed_s;
+        this->read_per_second_sensor_->publish_state(reads_per_second);
+      }
+      // Reset charge_reads_count_ and update charge_read_time_ to start a new measurement interval for reads-per-second calculation.
+      this->charge_reads_count_ = 0;
+      this->charge_read_time_ = now;
+  
+    }
+    break;
 
   default:
     break;
@@ -187,40 +195,36 @@ void INA226Component::report_coulomb() {
 
 void INA226Component::calc_charge() {
 
-  if (reads_count_++ == 0) {
+  if (reads_count_ == 0) {
     uint16_t raw_bus_voltage;
-    if (!this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
-      this->status_set_warning();
-      return;
+    if (this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
+      this->latest_voltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
     }
-
-    this->latest_voltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
-  } else {
-    if (reads_count_ > 20) {
-      reads_count_ = 0;
-    };
-    const auto now = App.get_loop_component_start_time();
-    const auto current = this->read_current_ma_();
-    this->latest_current_ = current / 1000.0f;
-    const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
-
-    this->partial_charge_mc_ += delta_mc; 
-    
-    const int64_t delta_int = (int64_t)this->partial_charge_mc_;
-    this->latest_charge_mc_ += delta_int;
-    this->partial_charge_mc_ -= delta_int;
-    
-    this->partial_energy_mj_ += this->latest_voltage_.value_or(0) * delta_mc; 
-    const int64_t energy_int = (int64_t)this->partial_energy_mj_;
-    this->latest_energy_mj_ += energy_int;
-    this->partial_energy_mj_ -= energy_int;
-
-    this->previous_time_ = now;
   }
+  reads_count_++;
+  if (reads_count_ > 20) {
+    reads_count_ = 0;
+  };
+  const auto now = App.get_loop_component_start_time();
+  const auto current = this->read_current_ma_();
+  this->latest_current_ = current / 1000.0f;
+  const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
 
-  #ifdef ESPHOME_LOG_HAS_VERBOSE
+  this->partial_charge_mc_ += delta_mc; 
+  
+  const int64_t delta_int = (int64_t)this->partial_charge_mc_;
+  this->latest_charge_mc_ += delta_int;
+  this->partial_charge_mc_ -= delta_int;
+  
+  this->partial_energy_mj_ += this->latest_voltage_.value_or(0) * delta_mc; 
+  const int64_t energy_int = (int64_t)this->partial_energy_mj_;
+  this->latest_energy_mj_ += energy_int;
+  this->partial_energy_mj_ -= energy_int;
+
+  this->previous_time_ = now;
+
+  
   this->charge_reads_count_++;
-  #endif
 }
 
 float INA226Component::read_current_ma_() {

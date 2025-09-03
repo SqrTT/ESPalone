@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+if [ ! -n "$VIRTUAL_ENV" ]; then
+  if [ -x "$(command -v uv)" ]; then
+    uv venv .venv
+  else
+    python3 -m venv .venv
+  fi
+  source .venv/bin/activate
+fi
+
+
+# Set the path to custom_components
+## This let's us have the structure we want <root>/custom_components/integration_blueprint
+## while at the same time have Home Assistant configuration inside <root>/config
+## without resulting to symlinks.
+# export PYTHONPATH="${PYTHONPATH}:${PWD}/custom_components"
+
+echo $PWD
+
+# Start Home Assistant
+# hass --config "${PWD}/config" --debug

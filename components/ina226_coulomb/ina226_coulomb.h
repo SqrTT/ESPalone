@@ -66,6 +66,7 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   void set_current_sensor(sensor::Sensor *current_sensor) { current_sensor_ = current_sensor; }
   void set_power_sensor(sensor::Sensor *power_sensor) { power_sensor_ = power_sensor; }
   void set_charge_coulombs_sensor(sensor::Sensor *power_sensor) { charge_coulombs_sensor_ = power_sensor; }
+  void set_read_per_second_sensor(sensor::Sensor *read_per_second_sensor) { read_per_second_sensor_ = read_per_second_sensor; }
 
   float get_voltage() override { return latest_voltage_.value_or(0);  };
   float get_current() override { return latest_current_;  };
@@ -86,6 +87,8 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   sensor::Sensor *current_sensor_{nullptr};
   sensor::Sensor *power_sensor_{nullptr};
   sensor::Sensor *charge_coulombs_sensor_{nullptr};
+  sensor::Sensor *read_per_second_sensor_{nullptr};
+  
   float bus_voltage_calibration_{1};
 
   int32_t twos_complement_(int32_t val, uint8_t bits);
@@ -101,10 +104,10 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
 
   uint32_t reads_count_{0};
   uint32_t previous_time_{0};
-  #ifdef ESPHOME_LOG_HAS_VERBOSE
+ 
   uint32_t charge_reads_count_{0};
-  uint32_t charge_reads_time_{0};
-  #endif
+  uint32_t charge_read_time_{0};
+
   uint8_t reportCount_{0};
   float read_current_ma_();
 };
