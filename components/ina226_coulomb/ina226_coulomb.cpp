@@ -206,9 +206,18 @@ void INA226Component::calc_charge() {
     reads_count_ = 0;
   };
   const auto now = App.get_loop_component_start_time();
-  const auto current = this->read_current_ma_();
-  this->latest_current_ = current / 1000.0f;
-  const auto delta_mc = current * (now - this->previous_time_) / 1000.0f; 
+
+  uint16_t raw_current;
+  if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
+    this->status_set_warning();
+    return;
+  }
+  
+  // Convert for 2's compliment and signed value
+  const auto current_a = (this->twos_complement_(raw_current, 16) * (this->calibration_lsb_ / 1000.0f)) / 1000.0f;
+
+  this->latest_current_ = current_a;
+  const auto delta_mc = current_a * (now - this->previous_time_);
 
   this->partial_charge_mc_ += delta_mc; 
   
@@ -225,19 +234,6 @@ void INA226Component::calc_charge() {
 
   
   this->charge_reads_count_++;
-}
-
-float INA226Component::read_current_ma_() {
-  uint16_t raw_current;
-  if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
-    this->status_set_warning();
-    return 0.0f;
-  }
-  
-  // Convert for 2's compliment and signed value
-  const float current_ma = this->twos_complement_(raw_current, 16) * (this->calibration_lsb_ / 1000.0f);
-
-  return current_ma;
 }
 
 int32_t INA226Component::twos_complement_(int32_t val, uint8_t bits) {

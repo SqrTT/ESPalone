@@ -31,7 +31,7 @@ CONF_ADC_TIME = "adc_time"
 CONF_CHARGE_COULOMBS = "charge_coulombs"
 CONF_HIGH_FREQUENCY_LOOP = "high_frequency_loop"
 CONF_BUS_VOLTAGE_CALIBRATION = "bus_voltage_calibration"
-CONF_READS_PER_SECOND = "reads_per_second"
+CONF_READ_PER_SECOND = "read_per_second"
 UNIT_COULOMB = "C"
 
 ina226_ns = cg.esphome_ns.namespace("ina226_coulomb")
@@ -79,7 +79,7 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_VOLTAGE,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
-            cv.Optional(CONF_READS_PER_SECOND): sensor.sensor_schema(
+            cv.Optional(CONF_READ_PER_SECOND): sensor.sensor_schema(
                 unit_of_measurement=UNIT_HERTZ,
                 accuracy_decimals=1,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC
@@ -177,7 +177,7 @@ async def to_code(config):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_charge_coulombs_sensor(sens))
 
-    if conf := config.get(CONF_READS_PER_SECOND):
+    if conf := config.get(CONF_READ_PER_SECOND):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_read_per_second_sensor(sens))
 
