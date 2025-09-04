@@ -91,7 +91,7 @@ void INA226Component::setup() {
 
   this->disable_loop();
 
-  this->set_interval("calcCharge", 0, [this]() {
+  this->set_interval("calcCharge", 1, [this]() {
     this->calc_charge();
   });
 
@@ -104,6 +104,7 @@ void INA226Component::setup() {
   this->previous_time_ = App.get_loop_component_start_time();
   this->charge_read_time_ = App.get_loop_component_start_time();
   // high_frequency_loop_requester_.start();
+  //;
 }
 
 void INA226Component::dump_config() {
@@ -181,7 +182,6 @@ void INA226Component::report_coulomb() {
       // Reset charge_reads_count_ and update charge_read_time_ to start a new measurement interval for reads-per-second calculation.
       this->charge_reads_count_ = 0;
       this->charge_read_time_ = now;
-  
     }
     break;
 
@@ -194,7 +194,12 @@ void INA226Component::report_coulomb() {
 }
 
 void INA226Component::calc_charge() {
+  const auto now = App.get_loop_component_start_time();
 
+  if (now == this->previous_time_) {
+    // skip if called too fast (less than 1ms)
+    return;
+  }
   if (reads_count_ == 0) {
     uint16_t raw_bus_voltage;
     if (this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
@@ -205,7 +210,6 @@ void INA226Component::calc_charge() {
   if (reads_count_ > 20) {
     reads_count_ = 0;
   };
-  const auto now = App.get_loop_component_start_time();
 
   uint16_t raw_current;
   if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
@@ -232,7 +236,6 @@ void INA226Component::calc_charge() {
 
   this->previous_time_ = now;
 
-  
   this->charge_reads_count_++;
 }
 

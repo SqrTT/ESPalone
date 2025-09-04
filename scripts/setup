@@ -13,6 +13,6 @@ if [ ! -n "$VIRTUAL_ENV" ]; then
   source .venv/bin/activate
 fi
 
-python3 -m pip install homeassistant
+python3 -m pip install esphome
 # This might fail if the file is missing, we dont care
 # python3 -m pip install --requirement requirements.txt

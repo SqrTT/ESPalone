@@ -58,7 +58,10 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   void set_adc_time_voltage(AdcTime time) { adc_time_voltage_ = time; }
   void set_adc_time_current(AdcTime time) { adc_time_current_ = time; }
   void set_adc_avg_samples(AdcAvgSamples samples) { adc_avg_samples_ = samples; }
-  void set_high_frequency_loop() { high_frequency_loop_requester_.start(); };
+  void set_high_frequency_loop() {
+    HighFrequencyLoopRequester high_frequency_loop_requester;
+     high_frequency_loop_requester.start();
+  };
 
   void set_bus_voltage_sensor(sensor::Sensor *bus_voltage_sensor) { bus_voltage_sensor_ = bus_voltage_sensor; }
   void set_bus_voltage_calibration(float calibration) { bus_voltage_calibration_ = calibration; }
@@ -74,8 +77,8 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   int64_t get_energy_j() override { return latest_energy_mj_ / 1000; } ;
 
  protected:
-  HighFrequencyLoopRequester high_frequency_loop_requester_;
-
+  int64_t latest_energy_mj_{0};
+  int64_t latest_charge_mc_{0};
   float shunt_resistance_ohm_;
   float max_current_a_;
   AdcTime adc_time_voltage_{AdcTime::ADC_TIME_1100US};
@@ -96,10 +99,8 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   optional<float> latest_voltage_;
   float latest_current_{0};
 
-  int64_t latest_energy_mj_{0};
   float partial_energy_mj_{0};
 
-  int64_t latest_charge_mc_{0};
   float partial_charge_mc_{0};
 
   uint32_t reads_count_{0};
