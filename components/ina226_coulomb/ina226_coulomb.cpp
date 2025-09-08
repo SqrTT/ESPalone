@@ -192,16 +192,15 @@ void INA226Component::calc_charge() {
     if (this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
       this->latest_voltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
     }
-  }
-  reads_count_++;
-  if (reads_count_ > 20) {
+  } else if (reads_count_ >= 20) {
     reads_count_ = 0;
   };
+  reads_count_++;
+
 
   uint16_t raw_current;
   if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
-    // ESP_LOGW(TAG, "Reading current failed");
-    this->status_set_warning();
+    this->status_set_warning("Reading current failed");
     return;
   }
   
