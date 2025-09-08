@@ -133,62 +133,49 @@ void INA226Component::update() {}
 
 void INA226Component::report_coulomb() {
 
-  switch (reportCount_ % SENSORS_COUNT) {
-  case 0:
-    if (this->current_sensor_ != nullptr) {
-      this->current_sensor_->publish_state(this->latest_current_);
-    }
-    break;
-  case 1:
-    if (this->bus_voltage_sensor_ != nullptr && latest_voltage_.has_value()) {
-      this->bus_voltage_sensor_->publish_state(this->latest_voltage_.value_or(0));
-    }
-    break;
-  case 2:
-    if (this->charge_coulombs_sensor_ != nullptr) {
-      this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
-    }
-    break;
-  case 3:
-    if (this->power_sensor_ != nullptr && this->latest_voltage_.has_value()) {
-      this->power_sensor_->publish_state(this->latest_voltage_.value_or(0) * this->latest_current_);
-    }
-  case 4:
-    if (this->shunt_voltage_sensor_ != nullptr) {
-      uint16_t raw_shunt_voltage;
-      if (!this->read_byte_16(INA226_REGISTER_SHUNT_VOLTAGE, &raw_shunt_voltage)) {
-        this->status_set_warning();
-        return;
-      }
-      // Convert for 2's compliment and signed value
-      float shunt_voltage_v = this->twos_complement_(raw_shunt_voltage, 16);
-      shunt_voltage_v *= 0.0000025f;
-      this->shunt_voltage_sensor_->publish_state(shunt_voltage_v);
-    }
-    break;
-  case 5:
-    if (this->charge_coulombs_sensor_ != nullptr) {
-      this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
-    }
-   break;
-  case 6:
-    if (this->read_per_second_sensor_ != nullptr) {
-      auto const now = App.get_loop_component_start_time();
-      auto const elapsed_s = (now - this->charge_read_time_) / 1000.0f;
-      if (elapsed_s != 0) {
-        const auto reads_per_second = static_cast<float>(this->charge_reads_count_) / elapsed_s;
-        this->read_per_second_sensor_->publish_state(reads_per_second);
-      }
-      // Reset charge_reads_count_ and update charge_read_time_ to start a new measurement interval for reads-per-second calculation.
-      this->charge_reads_count_ = 0;
-      this->charge_read_time_ = now;
-    }
-    break;
-
-  default:
-    break;
+  if (this->current_sensor_ != nullptr) {
+    this->current_sensor_->publish_state(this->latest_current_);
   }
-  reportCount_++;
+
+  if (this->bus_voltage_sensor_ != nullptr && latest_voltage_.has_value()) {
+    this->bus_voltage_sensor_->publish_state(this->latest_voltage_.value_or(0));
+  }
+
+  if (this->charge_coulombs_sensor_ != nullptr) {
+    this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
+  }
+
+  if (this->power_sensor_ != nullptr && this->latest_voltage_.has_value()) {
+    this->power_sensor_->publish_state(this->latest_voltage_.value_or(0) * this->latest_current_);
+  }
+
+  if (this->shunt_voltage_sensor_ != nullptr) {
+    uint16_t raw_shunt_voltage;
+    if (!this->read_byte_16(INA226_REGISTER_SHUNT_VOLTAGE, &raw_shunt_voltage)) {
+      this->status_set_warning();
+      return;
+    }
+    // Convert for 2's compliment and signed value
+    float shunt_voltage_v = this->twos_complement_(raw_shunt_voltage, 16);
+    shunt_voltage_v *= 0.0000025f;
+    this->shunt_voltage_sensor_->publish_state(shunt_voltage_v);
+  }
+
+  if (this->charge_coulombs_sensor_ != nullptr) {
+    this->charge_coulombs_sensor_->publish_state(this->get_charge_c());
+  }
+
+  if (this->read_per_second_sensor_ != nullptr) {
+    auto const now = App.get_loop_component_start_time();
+    auto const elapsed_s = (now - this->charge_read_time_) / 1000.0f;
+    if (elapsed_s != 0) {
+      const auto reads_per_second = static_cast<float>(this->charge_reads_count_) / elapsed_s;
+      this->read_per_second_sensor_->publish_state(reads_per_second);
+    }
+    // Reset charge_reads_count_ and update charge_read_time_ to start a new measurement interval for reads-per-second calculation.
+    this->charge_reads_count_ = 0;
+    this->charge_read_time_ = now;
+  }
 
   this->status_clear_warning();
 }
@@ -213,6 +200,7 @@ void INA226Component::calc_charge() {
 
   uint16_t raw_current;
   if (!this->read_byte_16(INA226_REGISTER_CURRENT, &raw_current)) {
+    // ESP_LOGW(TAG, "Reading current failed");
     this->status_set_warning();
     return;
   }

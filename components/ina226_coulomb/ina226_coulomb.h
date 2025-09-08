@@ -108,8 +108,6 @@ class INA226Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
  
   uint32_t charge_reads_count_{0};
   uint32_t charge_read_time_{0};
-
-  uint8_t reportCount_{0};
 };
 
 }  // namespace ina226_coulomb
