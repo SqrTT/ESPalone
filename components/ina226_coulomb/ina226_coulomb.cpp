@@ -37,8 +37,6 @@ static const uint8_t INA226_REGISTER_CALIBRATION = 0x05;
 static const uint16_t INA226_ADC_TIMES[] = {140, 204, 332, 588, 1100, 2116, 4156, 8244};
 static const uint16_t INA226_ADC_AVG_SAMPLES[] = {1, 4, 16, 64, 128, 256, 512, 1024};
 
-static const uint8_t SENSORS_COUNT = 7;
-
 void INA226Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up INA226...");
 
@@ -95,12 +93,6 @@ void INA226Component::setup() {
     this->calc_charge();
   });
 
-  this->stop_poller();
-
-  this->set_interval("updateReports", this->get_update_interval() / SENSORS_COUNT, [this]() {
-    this->report_coulomb();
-  });
-
   this->previous_time_ = App.get_loop_component_start_time();
   this->charge_read_time_ = App.get_loop_component_start_time();
   // high_frequency_loop_requester_.start();
@@ -129,10 +121,7 @@ void INA226Component::dump_config() {
 
 float INA226Component::get_setup_priority() const { return setup_priority::DATA; }
 
-void INA226Component::update() {}
-
-void INA226Component::report_coulomb() {
-
+void INA226Component::update() {
   if (this->current_sensor_ != nullptr) {
     this->current_sensor_->publish_state(this->latest_current_);
   }
@@ -187,7 +176,7 @@ void INA226Component::calc_charge() {
     // skip if called too fast (less than 1ms)
     return;
   }
-  if (reads_count_ == 0) {
+  if (reads_count_ == 1) {
     uint16_t raw_bus_voltage;
     if (this->read_byte_16(INA226_REGISTER_BUS_VOLTAGE, &raw_bus_voltage)) {
       this->latest_voltage_ = raw_bus_voltage * 0.00125f * this->bus_voltage_calibration_;
