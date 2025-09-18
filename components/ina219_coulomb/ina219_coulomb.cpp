@@ -66,8 +66,8 @@ void INA219Component::setup() {
   // Continuous operation of Bus and Shunt ADCs
   config |= 0b0000000000000111;
   // Bus ADC and Shunt ADC 12 bit+128 samples -> 68.10 ms
-  config |= 0b0000011110000000;
-  config |= 0b0000000001111000;
+  config |= 0b0000010010000000;
+  config |= 0b0000000001001000;
   const float shunt_max_voltage = this->shunt_resistance_ohm_ * this->max_current_a_;
 
   // 0b00x0000000000000 << 13 Bus Voltage Range (0 -> 16V, 1 -> 32V)

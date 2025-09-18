@@ -15,6 +15,7 @@ class INA219Component : public i2c::I2CDevice, public coulomb_meter::CoulombMete
   void dump_config() override;
   float get_setup_priority() const override;
   void update() override;
+ // void loop() override;
   void on_powerdown() override;
 
   void calc_charge();

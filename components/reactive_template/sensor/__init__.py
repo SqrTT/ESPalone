@@ -25,7 +25,7 @@ CONFIG_SCHEMA = (
         {
             cv.Optional(CONF_LAMBDA): cv.returning_lambda,
             # array of sensor_schema
-            cv.Optional(CONF_SENSORS): cv.ensure_list(cv.use_id(sensor.Sensor)),
+            cv.Optional(CONF_SENSORS): cv.ensure_list(cv.use_id(cg.EntityBase)),
         }
     )
 )
@@ -41,7 +41,6 @@ async def to_code(config):
         )
         cg.add(var.set_template(template_))
 
-    dependsOnName = f"{config['id'].id}_DependsOn"
     dependsOnSensors = []
 
     if CONF_SENSORS in config:
@@ -49,10 +48,13 @@ async def to_code(config):
     elif CONF_LAMBDA in config:
         dependsOnSensors = config[CONF_LAMBDA].requires_ids
 
-    expr = cg.RawExpression(f"static sensor::Sensor * const {dependsOnName}[{len(dependsOnSensors)}] = " + "{ " + ",".join(map(toIDs,dependsOnSensors)) + " }")
+    # expr = cg.RawExpression(f"static sensor::Sensor * const {dependsOnName}[{len(dependsOnSensors)}] = " + "{ " + ",".join(map(toIDs,dependsOnSensors)) + " }")
+    for s in dependsOnSensors:
+        sens = await cg.get_variable(s)
+        cg.add(var.add_to_track(sens))
 
-    cg.add(expr)
-    cg.add(var.set_depends_on_sensors(cg.RawExpression(f"{dependsOnName}"), len(dependsOnSensors)));
+    
+    # cg.add(var.set_depends_on_sensors(cg.RawExpression(f"{dependsOnName}"), len(dependsOnSensors)));
 
 
 @automation.register_action(
