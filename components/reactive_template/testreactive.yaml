@@ -1,0 +1,83 @@
+esphome:
+  name: testreactivetemplate
+  friendly_name: testReactiveTemplate
+
+host:
+  mac_address: '52:8f:e3:8a:19:ba'
+  
+# Enable logging
+logger:
+  level: VERBOSE
+
+# Enable Home Assistant API
+api:
+  
+button:
+  - platform: template
+    name: 'set 14.4'
+    on_press: 
+      then:
+        - lambda: |-
+            id(testsensor).publish_state(14.4);
+  - platform: template
+    name: 'set 12'
+    on_press: 
+      then:
+        - lambda: |-
+            id(testsensor).publish_state(12.0);
+  - platform: template
+    name: 'set 15'
+    on_press: 
+      then:
+        - lambda: |-
+            id(testsensor).publish_state(15.0);
+
+binary_sensor:
+  - platform: template
+    name: 'binbase'
+    id: 'binbase'
+    lambda: |-
+      return true;
+  - platform: 'reactive_template'
+    id: 'reactive'
+    name: 'reactive_bin'
+    lambda: |-
+      return id(testsensor).state > 13.0f && id(binbase).state ? true : false;
+  
+          
+sensor:
+    - platform: 'template'
+      id: 'testsensor'
+      unit_of_measurement: V
+      name: 'current_voltage'
+    - platform: 'reactive_template'
+      id: 'reactive_testsensor'
+      # depends_on_sensors:
+      #   - testsensor
+      #   - testsensorddd
+      name: 'Reactive Template Sensor'
+      lambda: |-
+        return 10 + id(testsensor).state + id(testsensorddd).state + ( id(binbase).state ? 10 : 30);
+    - platform: 'template'
+      id: 'testsensorddd'
+      unit_of_measurement: V
+      name: 'current_voltagesome_test'
+      lambda: |-
+        if (id(reactive_testsensor).state) {
+          return 42.0;
+        } else if (id(binbase).state) {
+          return 0.0;
+        }
+        return {};
+
+
+text_sensor:
+  - platform: template
+    id: charge_status
+    name: "ChargeStatus"
+
+external_components:
+  - source: 
+      type: local
+      path: /root/git/ESPalone/components
+    

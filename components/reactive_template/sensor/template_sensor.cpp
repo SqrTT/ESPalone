@@ -24,25 +24,23 @@ void ReactiveTemplateSensor::execute() {
     return;
   }
   #endif
-  // debounce call
-  this->set_timeout("updateValue", 40, [this]() {
-    auto val = (this->f_)();
-    if (val.has_value()) {
-      this->publish_state(*val);
-    }
-  });
+  
+  auto val = (this->f_)();
+  if (val.has_value()) {
+    this->publish_state(*val);
+  }
 }
 
-void ReactiveTemplateSensor::add_to_track(sensor::Sensor *sensor_to_add) {
-  sensor_to_add->add_on_state_callback([this](float state) {
-    this->execute();
+void ReactiveTemplateSensor::add_to_track(sensor::Sensor *sensor_to_add, std::function<void()> &&callback) {
+  sensor_to_add->add_on_state_callback([callback](float state) {
+    callback();
   });
 }
 
 #ifdef USE_BINARY_SENSOR
-void ReactiveTemplateSensor::add_to_track(binary_sensor::BinarySensor *sensor_to_add) {
-  sensor_to_add->add_on_state_callback([this](bool state) {
-    this->execute();
+void ReactiveTemplateSensor::add_to_track(binary_sensor::BinarySensor *sensor_to_add, std::function<void()> &&callback) {
+  sensor_to_add->add_on_state_callback([callback](bool state) {
+    callback();
   });
 }
 #endif

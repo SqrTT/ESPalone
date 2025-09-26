@@ -19,13 +19,13 @@ class ReactiveTemplateSensor : public sensor::Sensor, public Component {
 
   float get_setup_priority() const override;
 
-  void add_to_track(sensor::Sensor *sensor_to_add );
+  void add_to_track(sensor::Sensor *sensor_to_add, std::function<void(void)> &&callback );
   #ifdef USE_BINARY_SENSOR
-  void add_to_track(binary_sensor::BinarySensor *sensor_to_add);
+  void add_to_track(binary_sensor::BinarySensor *sensor_to_add, std::function<void(void)> &&callback);
   #endif
 
- protected:
   void execute();
+ protected:
   std::function<optional<float>()> f_{nullptr};
   uint8_t dependsOnCount;
 };

@@ -48,11 +48,31 @@ async def to_code(config):
     elif CONF_LAMBDA in config:
         dependsOnSensors = config[CONF_LAMBDA].requires_ids
 
+    dependsOnName = f"{config['id'].id}_execute_on_change"
+
     # expr = cg.RawExpression(f"static sensor::Sensor * const {dependsOnName}[{len(dependsOnSensors)}] = " + "{ " + ",".join(map(toIDs,dependsOnSensors)) + " }")
+    notnull = " && ".join([f"{s.id} != nullptr" for s in dependsOnSensors])
+    sensor_conditions = " && ".join([f"!std::isnan({s.id}->state)" for s in dependsOnSensors])
+
+    expr = cg.RawExpression(f"""
+void {dependsOnName}() {{
+    if ({notnull} && {sensor_conditions}) {{
+        App.scheduler.set_timeout({config['id'].id}, "updateValue", 40, []() {{
+            {config['id'].id}->execute();
+        }});
+    }} else {{
+        if (!std::isnan({config['id'].id}->state)) {{
+            {config['id'].id}->publish_state(NAN);
+        }}
+        App.scheduler.cancel_timeout({config['id'].id}, "updateValue");
+    }}
+}}
+""")
+
+    cg.add_global(expr)
     for s in dependsOnSensors:
         sens = await cg.get_variable(s)
-        cg.add(var.add_to_track(sens))
-
+        cg.add(var.add_to_track(sens, cg.RawExpression(f"{dependsOnName}")))
     
     # cg.add(var.set_depends_on_sensors(cg.RawExpression(f"{dependsOnName}"), len(dependsOnSensors)));
 
