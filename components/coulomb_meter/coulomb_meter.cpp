@@ -23,7 +23,7 @@ namespace esphome {
           #endif
           return out_min; // Return a safe default value
       }
-      return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+      return (int32_t) ((int64_t)(x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
     }
 
     void CoulombMeter::setup() {
@@ -111,6 +111,10 @@ namespace esphome {
         #endif
         current_energy_j_ = energy;
       }
+
+      this->prev_time_energy_j_ = this->current_energy_j_;
+      this->previous_charge_c_ = this->get_charge_c();
+      this->previous_energy_j_ = this->get_energy_j();
 
       this->set_interval("updateStatus", 1000, [this]() { updateState(); });
 
@@ -218,12 +222,12 @@ namespace esphome {
           ) {
             const auto charge_delta = cumulative_charge_in_c_ - cumulative_at_full_in_c_;
             const auto discharge_delta = cumulative_charge_out_c_ - cumulative_at_full_out_c_;
-            const auto capacity = charge_delta + discharge_delta;
-            #ifdef ESPHOME_LOG_HAS_DEBUG
-              ESP_LOGD(TAG, "Capacity calculated: %i, charge_delta: %i, discharge_delta: %i", capacity, charge_delta, discharge_delta);
-            #endif
+            if (discharge_delta > charge_delta) {
+              const auto capacity = (int32_t) (discharge_delta - charge_delta);
+              #ifdef ESPHOME_LOG_HAS_DEBUG
+                ESP_LOGD(TAG, "Capacity calculated: %d, charge_delta: %llu, discharge_delta: %llu", capacity, charge_delta, discharge_delta);
+              #endif
 
-            if (capacity > 0) {
               full_charge_calculated_c_ = capacity;
               int32_t stored_capacity = 0;
               if (full_charge_calculated_c_.has_value() && flash_full_charge_calculated_c_.load(&stored_capacity)) {
@@ -239,12 +243,9 @@ namespace esphome {
                 const auto value_to_save = full_charge_calculated_c_.value();
                 flash_full_charge_calculated_c_.save(&value_to_save);
               }
-              #ifdef ESPHOME_LOG_HAS_DEBUG
-                ESP_LOGD(TAG, "Capacity calculated: %i", capacity);
-              #endif
             } else {
               #ifdef ESPHOME_LOG_HAS_WARN
-                ESP_LOGW(TAG, "Capacity invalid: %i", capacity);
+                ESP_LOGW(TAG, "Capacity invalid: discharge_delta (%llu) <= charge_delta (%llu)", discharge_delta, charge_delta);
               #endif
             }
           }
@@ -258,20 +259,22 @@ namespace esphome {
             rtc_cumulative_at_full_in_j_.load(&cumulative_at_full_in_j_) &&
             rtc_cumulative_at_full_out_j_.load(&cumulative_at_full_out_j_)
           ) {
-            const auto energy_delta = cumulative_energy_in_j_ - cumulative_at_full_in_j_;
-            const auto discharge_delta = cumulative_energy_out_j_ - cumulative_at_full_out_j_;
-            const auto energy_capacity = energy_delta + discharge_delta;
+            const auto energy_in_delta = cumulative_energy_in_j_ - cumulative_at_full_in_j_;
+            const auto energy_out_delta = cumulative_energy_out_j_ - cumulative_at_full_out_j_;
 
-            #ifdef ESPHOME_LOG_HAS_DEBUG
-              ESP_LOGD(TAG, "Energy capacity calculated: %i, energy_delta: %i, discharge_delta: %i", energy_capacity, energy_delta, discharge_delta);
-            #endif
-            if (energy_capacity > 0) {
+            if (energy_out_delta > energy_in_delta) {
+              const auto energy_capacity = (int32_t) (energy_out_delta - energy_in_delta);
+
+              #ifdef ESPHOME_LOG_HAS_DEBUG
+                ESP_LOGD(TAG, "Energy capacity calculated: %d, energy_delta: %llu, discharge_delta: %llu", energy_capacity, energy_in_delta, energy_out_delta);
+              #endif
+
               full_energy_calculated_j_ = energy_capacity;
               int32_t stored_energy = 0;
               if (full_energy_calculated_j_.has_value() && flash_full_energy_calculated_j_.load(&stored_energy)) {
-                if (stored_energy != full_energy_calculated_j_) {
+                if (stored_energy != full_energy_calculated_j_.value()) {
                   #ifdef ESPHOME_LOG_HAS_DEBUG
-                    ESP_LOGD(TAG, "Saving full energy: %i", full_energy_calculated_j_);
+                    ESP_LOGD(TAG, "Saving full energy: %i", full_energy_calculated_j_.value());
                   #endif
                   const auto value_to_save = full_energy_calculated_j_.value();
                   flash_full_energy_calculated_j_.save(&value_to_save);
@@ -280,12 +283,9 @@ namespace esphome {
                 const auto value_to_save = full_energy_calculated_j_.value();
                 flash_full_energy_calculated_j_.save(&value_to_save);
               }
-              #ifdef ESPHOME_LOG_HAS_DEBUG
-                ESP_LOGD(TAG, "Energy capacity calculated: %i", energy_capacity);
-              #endif
             } else {
               #ifdef ESPHOME_LOG_HAS_WARN
-                ESP_LOGW(TAG, "Energy capacity invalid: %i", energy_capacity);
+                ESP_LOGW(TAG, "Energy capacity invalid: energy_out_delta (%llu) <= energy_in_delta (%llu)", energy_out_delta, energy_in_delta);
               #endif
             }
           }
@@ -377,9 +377,6 @@ namespace esphome {
           }
           break;
         case 10:
-          if (energy_calculated_sensor_ != nullptr && full_energy_calculated_j_.has_value()) {
-            publish_state_(energy_calculated_sensor_, full_energy_calculated_j_.value() / 3600.0f);
-          }
           break;
         case 11:
          if (charge_time_remaining_sensor_ != nullptr || discharge_time_remaining_sensor_ != nullptr) {
@@ -410,6 +407,7 @@ namespace esphome {
             publish_state_(discharge_time_remaining_sensor_, std::round(std::min(9999.0f, time_remaining)));
           }
         }
+        break;
         case 12:
           this->storeCounters();
           break;

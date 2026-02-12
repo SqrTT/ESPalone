@@ -49,12 +49,14 @@ class InternalTimer {
     bool is_running_{false};
 };
 
-class MovingAvarage {
+class MovingAverage {
   public:
 
     void setup(u_int8_t size) {
       this->size_ = size;
-      this->values_.resize(size);
+      this->values_.assign(size, 0);
+      this->count_ = 0;
+      this->index_ = 0;
     }
 
     void add(const int32_t value) {
@@ -68,19 +70,19 @@ class MovingAvarage {
 
     float get() {
       if (count_ == 0) {
-        return 0.0;
+        return 0.0f;
       }
       
-      int32_t sum = 0;
-      for (int i = 0; i < this->size_; i++) {
+      int64_t sum = 0;
+      for (int i = 0; i < this->count_; i++) {
         sum += this->values_[i];
       }
       
-      return sum / count_;
+      return (float)sum / count_;
     }
 
   private:
-    int size_;
+    int size_{0};
     int index_{0};
     int count_{0};
     std::vector<int32_t> values_;
@@ -183,7 +185,7 @@ class CoulombMeter : public PollingComponent {
 
     sensor::Sensor *charge_time_remaining_sensor_{nullptr};
     sensor::Sensor *discharge_time_remaining_sensor_{nullptr};
-    MovingAvarage energy_usage_average_;
+    MovingAverage energy_usage_average_;
     int32_t prev_time_energy_j_{0};
 
     uint8_t report_count_{0};
